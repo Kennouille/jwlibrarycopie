@@ -688,63 +688,108 @@
 
   async function startPreparation() {
     try {
-      const file1 = document.getElementById("file1").files[0];
-      const file2 = document.getElementById("file2").files[0];
-      const localDatetime = document.getElementById("local_datetime").value;
+      const file1 = document.getElementById('file1').files[0];
+      const file2 = document.getElementById('file2').files[0];
+      const localDatetime = document.getElementById('local_datetime').value;
 
-      if (!file1 || !file2 || !localDatetime) {
-        alert("Veuillez sélectionner deux fichiers et une date");
-        return;
+      if (!file1 || !file2)
+        throw new Error(translations[window.currentLang].errors.selectFiles);
+      if (!file1.name.endsWith('.jwlibrary') || !file2.name.endsWith('.jwlibrary'))
+        throw new Error(translations[window.currentLang].errors.extension);
+      if (!localDatetime)
+        throw new Error(translations[window.currentLang].errors.missingDate);
+
+      const mergeButton = document.getElementById('mergeButton');
+      mergeButton.disabled = true;
+
+      await updateProgress(5, "Préparation des fichiers...", 1);
+      await simulateProcessing(800, 20, "Chargement des fichiers...", 1);
+
+      const zip1 = await JSZip.loadAsync(file1);
+      const zip2 = await JSZip.loadAsync(file2);
+
+      const userData1 = await zip1.file("userData.db").async("blob");
+      const userData2 = await zip2.file("userData.db").async("blob");
+
+      const maxCombinedSize = 95 * 1024 * 1024;
+      if (userData1.size + userData2.size > maxCombinedSize) {
+        throw new Error("Les fichiers userData.db sont trop volumineux (plus de 95MB combinés).");
       }
 
-      // 1. Upload des fichiers
+      const media1 = [], media2 = [];
+
+      const hashFile = async (file) => {
+        const buffer = await file.async("arraybuffer");
+        const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
+        return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+      };
+
+      const collectMedia = async (zip, targetList, skip = ["userData.db", "userData.db-shm", "userData.db-wal"]) => {
+        const skipSet = new Set(skip.map(s => s.toLowerCase()));
+        for (const file of Object.values(zip.files)) {
+          if (skipSet.has(file.name.toLowerCase())) continue;
+          const hash = await hashFile(file);
+          targetList.push({ name: file.name, file, hash });
+        }
+      };
+
+      await collectMedia(zip1, media1);
+      await collectMedia(zip2, media2);
+
+      const hashSet1 = new Set(media1.map(m => m.hash));
+      const uniqueMedia2 = media2.filter(m => !hashSet1.has(m.hash));
+      const combinedMedia = [...media1, ...uniqueMedia2];
+
+      window.mediaToInclude = await Promise.all(
+        combinedMedia.map(async (media) => ({
+          name: media.name,
+          file: await media.file.async("blob"),
+          hash: media.hash
+        }))
+      );
+
+      window.userData1 = userData1;
+      window.userData2 = userData2;
+
       const formData = new FormData();
-      formData.append("file1", file1);
-      formData.append("file2", file2);
+      formData.append("file1", new File([userData1], "userData1.db"));
+      formData.append("file2", new File([userData2], "userData2.db"));
 
-      showStep(1);
-      updateProgress(10, "Téléversement des fichiers...");
+      await updateProgress(30, "Téléversement...", 2);
+      await uploadWithProgress(`${BASE_URL}/upload`, formData);
 
-      const uploadResponse = await fetch(`${BASE_URL}/upload`, {
-        method: "POST",
-        body: formData
-      });
-
-      if (!uploadResponse.ok) {
-        throw new Error("Erreur lors de l'envoi des fichiers");
-      }
-
-      // 2. Appel à /prepare-preview
-      showStep(2);
-      updateProgress(30, "Extraction et préparation des données...");
-
+      await updateProgress(60, "Préparation de l'aperçu...", 3);
       const previewRes = await fetch(`${BASE_URL}/prepare-preview`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
-        }
+        },
+        body: JSON.stringify({ local_datetime: localDatetime })
       });
 
       if (!previewRes.ok) {
-        throw new Error("Erreur lors de la préparation des données");
+        const text = await previewRes.text();
+        throw new Error("Erreur dans la préparation : " + text);
       }
 
       const previewData = await previewRes.json();
 
-      showStep(3);
-      updateProgress(60, "Prévisualisation en cours...");
+      await updateProgress(85, "Prévisualisation en cours...", 4);
 
-      // 3. Affichage interactif (tu pourras modifier loadPreviewData)
-      loadPreviewData(previewData);
+      loadPreviewData(previewData);  // ← ici tu montres les tabs Notes, Bookmarks, Tags, etc.
 
-      showStep(4);
-      updateProgress(80, "Affichage terminé");
+      await updateProgress(100, "Aperçu prêt", 5);
+      document.getElementById('merge-summary').classList.remove('hidden');
+      document.getElementById("progressDetails").textContent = "✅ Prévisualisation terminée.";
     } catch (error) {
-      console.error("❌ Erreur:", error);
-      document.getElementById("errorDisplayWrapper").style.display = "block";
-      document.getElementById("errorDisplay").innerText = error.message;
+      console.error("Erreur:", error);
+      showError(error.message);
+      await logMergeToSupabase("error", error.message);
+      await updateProgress(currentProgress, `Erreur: ${error.message}`);
+      document.getElementById('mergeButton').disabled = false;
     }
   }
+
 
   function loadPreviewData(data) {
     document.getElementById("preview-section").classList.remove("hidden");
