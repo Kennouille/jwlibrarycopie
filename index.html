@@ -474,36 +474,29 @@
 
 <div id="preview-section" class="hidden">
   <h3>Prévisualisation et Choix Utilisateur</h3>
+
   <div class="tabs">
     <button class="tab-btn" onclick="showTab('notes')">📝 Notes</button>
     <button class="tab-btn" onclick="showTab('bookmarks')">🔖 Bookmarks</button>
     <button class="tab-btn" onclick="showTab('tags')">🏷️ Tags</button>
   </div>
 
-  <div style="margin-top: 30px; text-align: center;">
-    <button class="btn btn-primary" onclick="startMerge()">✅ Lancer la fusion finale</button>
-  </div>
-
   <div id="preview-content">
-    <div id="tab-notes" class="tab-content">
-      <!-- Ajoute ICI la table -->
-      <table class="preview-table">
-        <thead>
-          <tr>
-            <th>Note fichier 1</th>
-            <th>Note fichier 2</th>
-            <th>Choix</th>
-          </tr>
-        </thead>
-        <tbody id="notes-preview-body"></tbody>
-      </table>
-    </div>
+    <!-- Ces trois divs doivent exister et avoir les bons IDs -->
+    <div id="tab-notes" class="tab-content hidden"></div>
     <div id="tab-bookmarks" class="tab-content hidden"></div>
     <div id="tab-tags" class="tab-content hidden"></div>
+  </div>
+
+  <div style="margin-top: 30px; text-align: center;">
+    <button class="btn btn-primary" onclick="startMerge()">✅ Lancer la fusion finale</button>
   </div>
 </div>
 
 
+<div style="margin-top: 30px; text-align: center;">
+  <button class="btn btn-primary" onclick="startMerge()">✅ Lancer la fusion finale</button>
+</div>
 
 <div id="errorDisplayWrapper" style="
   max-width: 800px;
@@ -826,17 +819,14 @@
 
 
   function loadPreviewData(previewData) {
-    console.log("📦 Données reçues pour l’aperçu :", previewData);
     document.getElementById("preview-section").classList.remove("hidden");
 
-    const tables = ['notes', 'bookmarks', 'tags'];
-
-    for (const tableName of tables) {
-      const contents = previewData[tableName];
+    for (const [tableName, contents] of Object.entries(previewData)) {
+      const tabEl = document.getElementById(`tab-${tableName.toLowerCase()}`);
       console.log(`🔍 Aperçu .${tableName} :`, contents);
 
-      const tabEl = document.getElementById(`tab-${tableName}`);
-      if (!tabEl || !contents || !contents.file1 || !contents.file2) {
+      // Vérification sécurisée
+      if (!contents || !Array.isArray(contents.file1) || !Array.isArray(contents.file2)) {
         console.warn(`⛔ Onglet manquant ou données invalides pour ${tableName}`);
         continue;
       }
@@ -872,16 +862,15 @@
     }
   }
 
+
   function showTab(tabName) {
     const allTabs = document.querySelectorAll('.tab-content');
-    const buttons = document.querySelectorAll('.tab-btn');
-
     allTabs.forEach(tab => tab.classList.add('hidden'));
-    buttons.forEach(btn => btn.classList.remove('active'));
 
-    document.getElementById(`tab-${tabName}`).classList.remove('hidden');
-    document.querySelector(`.tab-btn[onclick="showTab('${tabName}')"]`).classList.add('active');
+    const currentTab = document.getElementById(`tab-${tabName}`);
+    if (currentTab) currentTab.classList.remove('hidden');
   }
+
 
   function renderNotesPreview(data) {
     const tbody = document.getElementById("notes-preview-body");
