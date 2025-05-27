@@ -939,19 +939,6 @@
     }
   }
 
-  function loadPreviewData() {
-    const container = document.getElementById("diffPreviewContainer");
-    container.classList.remove("hidden");
-
-    fetch(`${BASE_URL}/preview-merge`)
-      .then(res => res.json())
-      .then(data => renderPreviewTabs(data))
-      .catch(err => {
-        container.innerHTML = "<p>Erreur de chargement de la comparaison</p>";
-        console.error(err);
-      });
-  }
-
   function renderPreviewTabs(data) {
     const tabs = Object.keys(data); // ["notes", "bookmarks", "tags"]
     const tabButtons = document.getElementById("tab-buttons");
