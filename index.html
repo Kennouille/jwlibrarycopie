@@ -793,6 +793,20 @@
 
       await updateProgress(85, "Prévisualisation en cours...", 4);
 
+      console.log("📦 Données reçues pour l’aperçu :", previewData);
+
+      // Sécurité : affichage des clés attendues
+      console.log("🔍 Aperçu .notes :", previewData.notes);
+      console.log("🔍 Aperçu .bookmarks :", previewData.bookmarks);
+      console.log("🔍 Aperçu .tags :", previewData.tags);
+
+      // Empêche l’erreur si previewData.notes est undefined
+      if (!previewData.notes || !Array.isArray(previewData.notes)) {
+        console.error("❌ 'notes' est manquant ou invalide dans le JSON reçu.");
+        throw new Error("Le backend n’a pas renvoyé la structure attendue pour les notes.");
+      }
+
+
       loadPreviewData(previewData);  // ← ici tu montres les tabs Notes, Bookmarks, Tags, etc.
 
       renderNotesPreview(previewData.notes);
