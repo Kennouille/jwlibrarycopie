@@ -832,13 +832,6 @@
     showTab("notes");
   }
 
-  function showTab(name) {
-    for (const tab of ["notes", "bookmarks", "tags"]) {
-      document.getElementById(`tab-${tab}`).classList.add("hidden");
-    }
-    document.getElementById(`tab-${name}`).classList.remove("hidden");
-  }
-
   function showTab(tabName) {
     const allTabs = document.querySelectorAll('.tab-content');
     const buttons = document.querySelectorAll('.tab-btn');
