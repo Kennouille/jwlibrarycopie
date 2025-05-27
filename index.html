@@ -479,6 +479,10 @@
     <button class="tab-btn" onclick="showTab('bookmarks')">🔖 Bookmarks</button>
     <button class="tab-btn" onclick="showTab('tags')">🏷️ Tags</button>
   </div>
+  <div style="margin-top: 30px; text-align: center;">
+    <button class="btn btn-primary" onclick="startMerge()">✅ Lancer la fusion finale</button>
+  </div>
+
 
   <div id="preview-content">
     <div id="tab-notes" class="tab-content"></div>
@@ -834,6 +838,18 @@
     }
     document.getElementById(`tab-${name}`).classList.remove("hidden");
   }
+
+  function showTab(tabName) {
+    const allTabs = document.querySelectorAll('.tab-content');
+    const buttons = document.querySelectorAll('.tab-btn');
+
+    allTabs.forEach(tab => tab.classList.add('hidden'));
+    buttons.forEach(btn => btn.classList.remove('active'));
+
+    document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+    document.querySelector(`.tab-btn[onclick="showTab('${tabName}')"]`).classList.add('active');
+  }
+
 
 
   async function startMerge() {
