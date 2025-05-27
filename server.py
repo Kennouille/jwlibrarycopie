@@ -156,8 +156,8 @@ def generate_preview_data(file1_db, file2_db):
 @app.route('/prepare-preview', methods=['POST'])
 def prepare_preview():
     try:
-        file1_path = os.path.join(UPLOAD_FOLDER, "userData1.db")
-        file2_path = os.path.join(UPLOAD_FOLDER, "userData2.db")
+        file1_path = os.path.join("extracted", "file1_extracted", "userData.db")
+        file2_path = os.path.join("extracted", "file2_extracted", "userData.db")
 
         if not os.path.exists(file1_path) or not os.path.exists(file2_path):
             return jsonify({"error": "Fichiers non trouvés"}), 400
