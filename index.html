@@ -826,11 +826,20 @@
 
 
   function loadPreviewData(previewData) {
+    console.log("📦 Données reçues pour l’aperçu :", previewData);
     document.getElementById("preview-section").classList.remove("hidden");
 
-    for (const [tableName, contents] of Object.entries(previewData)) {
-      const tabEl = document.getElementById(`tab-${tableName.toLowerCase()}`);
-      if (!tabEl || !contents?.file1 || !contents?.file2) continue;
+    const tables = ['notes', 'bookmarks', 'tags'];
+
+    for (const tableName of tables) {
+      const contents = previewData[tableName];
+      console.log(`🔍 Aperçu .${tableName} :`, contents);
+
+      const tabEl = document.getElementById(`tab-${tableName}`);
+      if (!tabEl || !contents || !contents.file1 || !contents.file2) {
+        console.warn(`⛔ Onglet manquant ou données invalides pour ${tableName}`);
+        continue;
+      }
 
       tabEl.innerHTML = `
         <table style="width: 100%; border-collapse: collapse;">
@@ -862,8 +871,6 @@
       `;
     }
   }
-
-
 
   function showTab(tabName) {
     const allTabs = document.querySelectorAll('.tab-content');
