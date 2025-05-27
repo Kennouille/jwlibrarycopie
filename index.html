@@ -830,7 +830,7 @@
 
     for (const [tableName, contents] of Object.entries(previewData)) {
       const tabEl = document.getElementById(`tab-${tableName.toLowerCase()}`);
-      if (!tabEl) continue;
+      if (!tabEl || !contents?.file1 || !contents?.file2) continue;
 
       tabEl.innerHTML = `
         <table style="width: 100%; border-collapse: collapse;">
@@ -862,6 +862,7 @@
       `;
     }
   }
+
 
 
   function showTab(tabName) {
