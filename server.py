@@ -145,6 +145,265 @@ def read_notes_and_highlights(db_path):
     return {"notes": notes, "highlights": highlights}
 
 
+def generate_preview_data(file1_db, file2_db):
+    return {
+        "notes": compare_notes_with_preview(file1_db, file2_db),
+        "bookmarks": compare_bookmarks_with_preview(file1_db, file2_db),
+        "tags": compare_tags_with_preview(file1_db, file2_db)
+    }
+
+
+@app.route('/prepare-preview', methods=['POST'])
+def prepare_preview():
+    print("📦 Préparation de l'aperçu comparatif en cours...")
+
+    file1_path = os.path.join(EXTRACT_FOLDER, "file1_extracted", "userData.db")
+    file2_path = os.path.join(EXTRACT_FOLDER, "file2_extracted", "userData.db")
+
+    if not os.path.exists(file1_path) or not os.path.exists(file2_path):
+        return jsonify({"error": "Les fichiers extraits sont introuvables"}), 400
+
+    def fetch_table_data(db_path, table, fields, key="NoteGuid"):
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        try:
+            cursor.execute(f"SELECT {key}, {', '.join(fields)} FROM {table}")
+            rows = cursor.fetchall()
+        except Exception as e:
+            print(f"❌ Erreur dans {table} ({db_path}):", e)
+            return {}
+        finally:
+            conn.close()
+
+        data = {}
+        for row in rows:
+            row_dict = dict(zip([key] + fields, row))
+            data[row[0]] = row_dict
+        return data
+
+    preview_data = {}
+
+    preview_targets = [
+        ("notes", "Note", ["Title", "Content", "LastModified", "UserMarkId"], "NoteGuid"),
+        ("bookmarks", "Bookmark", ["Title", "BlockId", "LastModified"], "BookmarkId"),
+        ("tags", "Tag", ["Name"], "TagId")
+    ]
+
+    for key, table, fields, id_field in preview_targets:
+        data1 = fetch_table_data(file1_path, table, fields, id_field)
+        data2 = fetch_table_data(file2_path, table, fields, id_field)
+
+        all_ids = set(data1.keys()).union(data2.keys())
+        merged_rows = []
+
+        for row_id in all_ids:
+            row1 = data1.get(row_id)
+            row2 = data2.get(row_id)
+
+            # tentative de merge automatique = garder le plus récent si date dispo
+            merged = None
+            if row1 and not row2:
+                merged = row1
+            elif row2 and not row1:
+                merged = row2
+            elif row1 and row2:
+                lm1 = row1.get("LastModified", "")
+                lm2 = row2.get("LastModified", "")
+                merged = row2 if lm2 > lm1 else row1
+
+            merged_rows.append({
+                "id": row_id,
+                "file1": row1,
+                "file2": row2,
+                "merged": merged
+            })
+
+        preview_data[key] = merged_rows
+
+    return jsonify(preview_data), 200
+
+
+def compare_notes_with_preview(file1_db, file2_db):
+    import sqlite3
+
+    conn1 = sqlite3.connect(file1_db)
+    conn2 = sqlite3.connect(file2_db)
+    cur1 = conn1.cursor()
+    cur2 = conn2.cursor()
+
+    cur1.execute("SELECT NoteGUID, Title, Content, LastModified FROM Note")
+    notes1 = {row[0]: row[1:] for row in cur1.fetchall()}
+
+    cur2.execute("SELECT NoteGUID, Title, Content, LastModified FROM Note")
+    notes2 = {row[0]: row[1:] for row in cur2.fetchall()}
+
+    all_guids = set(notes1.keys()) | set(notes2.keys())
+    results = []
+
+    for guid in all_guids:
+        n1 = notes1.get(guid)
+        n2 = notes2.get(guid)
+
+        def dictify(row):
+            if not row:
+                return None
+            return {
+                "title": row[0],
+                "content": row[1],
+                "lastModified": row[2]
+            }
+
+        merged = None
+        status = "identical"
+        default = None
+
+        if n1 and n2:
+            status = "identical" if n1 == n2 else "different"
+            default = "file2" if n2[2] > n1[2] else "file1"
+            merged = dictify(n2) if default == "file2" else dictify(n1)
+        elif n1:
+            status = "only_file1"
+            default = "file1"
+            merged = dictify(n1)
+        elif n2:
+            status = "only_file2"
+            default = "file2"
+            merged = dictify(n2)
+
+        results.append({
+            "guid": guid,
+            "file1": dictify(n1),
+            "file2": dictify(n2),
+            "merged": merged,
+            "status": status,
+            "defaultChoice": default
+        })
+
+    conn1.close()
+    conn2.close()
+    return results
+
+
+def compare_bookmarks_with_preview(file1_db, file2_db):
+    conn1 = sqlite3.connect(file1_db)
+    conn2 = sqlite3.connect(file2_db)
+    cur1 = conn1.cursor()
+    cur2 = conn2.cursor()
+
+    cur1.execute("SELECT BookmarkId, LocationId, Title FROM Bookmark")
+    bookmarks1 = {row[0]: row[1:] for row in cur1.fetchall()}
+
+    cur2.execute("SELECT BookmarkId, LocationId, Title FROM Bookmark")
+    bookmarks2 = {row[0]: row[1:] for row in cur2.fetchall()}
+
+    all_ids = set(bookmarks1.keys()) | set(bookmarks2.keys())
+    results = []
+
+    for bid in all_ids:
+        b1 = bookmarks1.get(bid)
+        b2 = bookmarks2.get(bid)
+
+        def dictify(b):
+            if not b:
+                return None
+            return {
+                "locationId": b[0],
+                "title": b[1]
+            }
+
+        status = "identical"
+        default = None
+        merged = None
+
+        if b1 and b2:
+            status = "identical" if b1 == b2 else "different"
+            default = "file2"
+            merged = dictify(b2)
+        elif b1:
+            status = "only_file1"
+            default = "file1"
+            merged = dictify(b1)
+        elif b2:
+            status = "only_file2"
+            default = "file2"
+            merged = dictify(b2)
+
+        results.append({
+            "id": bid,
+            "file1": dictify(b1),
+            "file2": dictify(b2),
+            "merged": merged,
+            "status": status,
+            "defaultChoice": default
+        })
+
+    conn1.close()
+    conn2.close()
+    return results
+
+
+def compare_tags_with_preview(file1_db, file2_db):
+    conn1 = sqlite3.connect(file1_db)
+    conn2 = sqlite3.connect(file2_db)
+    cur1 = conn1.cursor()
+    cur2 = cur2.cursor()
+
+    cur1.execute("SELECT TagId, Name FROM Tag")
+    tags1 = {row[0]: row[1] for row in cur1.fetchall()}
+
+    cur2.execute("SELECT TagId, Name FROM Tag")
+    tags2 = {row[0]: row[1] for row in cur2.fetchall()}
+
+    all_ids = set(tags1.keys()) | set(tags2.keys())
+    results = []
+
+    for tid in all_ids:
+        name1 = tags1.get(tid)
+        name2 = tags2.get(tid)
+
+        status = "identical"
+        default = None
+        merged = None
+
+        if name1 and name2:
+            status = "identical" if name1 == name2 else "different"
+            default = "file2"
+            merged = name2
+        elif name1:
+            status = "only_file1"
+            default = "file1"
+            merged = name1
+        elif name2:
+            status = "only_file2"
+            default = "file2"
+            merged = name2
+
+        results.append({
+            "id": tid,
+            "file1": { "name": name1 } if name1 else None,
+            "file2": { "name": name2 } if name2 else None,
+            "merged": { "name": merged } if merged else None,
+            "status": status,
+            "defaultChoice": default
+        })
+
+    conn1.close()
+    conn2.close()
+    return results
+
+
+@app.route('/preview-merge', methods=['GET'])
+def preview_merge():
+    file1 = os.path.join(EXTRACT_FOLDER, "file1_extracted", "userData.db")
+    file2 = os.path.join(EXTRACT_FOLDER, "file2_extracted", "userData.db")
+
+    if not os.path.exists(file1) or not os.path.exists(file2):
+        return jsonify({"error": "Fichiers source manquants"}), 400
+
+    preview_data = generate_preview_data(file1, file2)
+    return jsonify(preview_data), 200
+
+
 def extract_file(file_path, extract_folder):
     zip_path = file_path.replace(".jwlibrary", ".zip")
     if os.path.exists(zip_path):

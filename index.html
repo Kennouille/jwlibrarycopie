@@ -351,6 +351,37 @@
       cursor: not-allowed;
     }
 
+    .tabs { margin-top: 20px; }
+    .tab-btn {
+      padding: 10px;
+      margin-right: 10px;
+      cursor: pointer;
+      border: 1px solid #ccc;
+      background: #f5f5f5;
+    }
+    .tab-content {
+      margin-top: 15px;
+    }
+    .hidden {
+      display: none;
+    }
+    .preview-row {
+      display: flex;
+      border-bottom: 1px solid #ddd;
+      padding: 6px 0;
+    }
+    .preview-cell {
+      flex: 1;
+      padding: 0 10px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .preview-controls {
+      text-align: center;
+    }
+    .preview-cell.diff {
+      background-color: #fff7dc;
+    }
 
 
   </style>
@@ -425,7 +456,7 @@
       </div>
   </div>
 
-  <button id="mergeButton" onclick="startMerge()">Charger, Extraire & Analyser</button>
+  <button id="mergeButton" onclick="startPreparation()">Charger, Extraire & Analyser</button>
 
   <div id="merge-summary" class="conflict-container hidden">
     <h3>Résumé de la fusion</h3>
@@ -440,6 +471,23 @@
     <button id="manualDownloadBtn" class="btn btn-primary"></button>
   </div>
 </div>
+
+<div id="preview-section" class="hidden">
+  <h3>Prévisualisation et Choix Utilisateur</h3>
+  <div class="tabs">
+    <button class="tab-btn" onclick="showTab('notes')">📝 Notes</button>
+    <button class="tab-btn" onclick="showTab('bookmarks')">🔖 Bookmarks</button>
+    <button class="tab-btn" onclick="showTab('tags')">🏷️ Tags</button>
+  </div>
+
+  <div id="preview-content">
+    <div id="tab-notes" class="tab-content"></div>
+    <div id="tab-bookmarks" class="tab-content hidden"></div>
+    <div id="tab-tags" class="tab-content hidden"></div>
+  </div>
+</div>
+
+
 <div id="errorDisplayWrapper" style="
   max-width: 800px;
   margin: 30px auto 0;
@@ -638,6 +686,110 @@
     }
   }
 
+  async function startPreparation() {
+    try {
+      const file1 = document.getElementById("file1").files[0];
+      const file2 = document.getElementById("file2").files[0];
+      const localDatetime = document.getElementById("local_datetime").value;
+
+      if (!file1 || !file2 || !localDatetime) {
+        alert("Veuillez sélectionner deux fichiers et une date");
+        return;
+      }
+
+      // 1. Upload des fichiers
+      const formData = new FormData();
+      formData.append("file1", file1);
+      formData.append("file2", file2);
+
+      showStep(1);
+      updateProgress(10, "Téléversement des fichiers...");
+
+      const uploadResponse = await fetch(`${BASE_URL}/upload`, {
+        method: "POST",
+        body: formData
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error("Erreur lors de l'envoi des fichiers");
+      }
+
+      // 2. Appel à /prepare-preview
+      showStep(2);
+      updateProgress(30, "Extraction et préparation des données...");
+
+      const previewRes = await fetch(`${BASE_URL}/prepare-preview`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (!previewRes.ok) {
+        throw new Error("Erreur lors de la préparation des données");
+      }
+
+      const previewData = await previewRes.json();
+
+      showStep(3);
+      updateProgress(60, "Prévisualisation en cours...");
+
+      // 3. Affichage interactif (tu pourras modifier loadPreviewData)
+      loadPreviewData(previewData);
+
+      showStep(4);
+      updateProgress(80, "Affichage terminé");
+    } catch (error) {
+      console.error("❌ Erreur:", error);
+      document.getElementById("errorDisplayWrapper").style.display = "block";
+      document.getElementById("errorDisplay").innerText = error.message;
+    }
+  }
+
+  function loadPreviewData(data) {
+    document.getElementById("preview-section").classList.remove("hidden");
+
+    for (const tab of ["notes", "bookmarks", "tags"]) {
+      const container = document.getElementById(`tab-${tab}`);
+      container.innerHTML = "";
+
+      const rows = data[tab] || [];
+      rows.forEach(row => {
+        const rowDiv = document.createElement("div");
+        rowDiv.classList.add("preview-row");
+
+        const cell1 = document.createElement("div");
+        cell1.className = "preview-cell";
+        cell1.textContent = JSON.stringify(row.file1 || {}, null, 2);
+        if (JSON.stringify(row.file1) !== JSON.stringify(row.file2)) cell1.classList.add("diff");
+
+        const cell2 = document.createElement("div");
+        cell2.className = "preview-cell";
+        cell2.textContent = JSON.stringify(row.file2 || {}, null, 2);
+        if (JSON.stringify(row.file1) !== JSON.stringify(row.file2)) cell2.classList.add("diff");
+
+        const merged = document.createElement("div");
+        merged.className = "preview-cell";
+        merged.textContent = JSON.stringify(row.merged || {}, null, 2);
+
+        rowDiv.appendChild(cell1);
+        rowDiv.appendChild(cell2);
+        rowDiv.appendChild(merged);
+
+        container.appendChild(rowDiv);
+      });
+    }
+
+    showTab("notes");
+  }
+
+  function showTab(name) {
+    for (const tab of ["notes", "bookmarks", "tags"]) {
+      document.getElementById(`tab-${tab}`).classList.add("hidden");
+    }
+    document.getElementById(`tab-${name}`).classList.remove("hidden");
+  }
+
 
   async function startMerge() {
     try {
@@ -786,6 +938,77 @@
       document.getElementById('mergeButton').disabled = false;
     }
   }
+
+  function loadPreviewData() {
+    const container = document.getElementById("diffPreviewContainer");
+    container.classList.remove("hidden");
+
+    fetch(`${BASE_URL}/preview-merge`)
+      .then(res => res.json())
+      .then(data => renderPreviewTabs(data))
+      .catch(err => {
+        container.innerHTML = "<p>Erreur de chargement de la comparaison</p>";
+        console.error(err);
+      });
+  }
+
+  function renderPreviewTabs(data) {
+    const tabs = Object.keys(data); // ["notes", "bookmarks", "tags"]
+    const tabButtons = document.getElementById("tab-buttons");
+    const tabContents = document.getElementById("tab-contents");
+
+    tabButtons.innerHTML = "";
+    tabContents.innerHTML = "";
+
+    tabs.forEach((tabName, index) => {
+      const btn = document.createElement("button");
+      btn.className = "tab-button";
+      btn.textContent = tabName;
+      if (index === 0) btn.classList.add("active");
+      btn.onclick = () => switchPreviewTab(tabName);
+      tabButtons.appendChild(btn);
+
+      const tabDiv = document.createElement("div");
+      tabDiv.id = `tab-${tabName}`;
+      tabDiv.className = "tab-content" + (index === 0 ? " active" : "");
+
+      const table = document.createElement("table");
+      table.className = "diff-table";
+      table.innerHTML = `
+        <thead><tr><th>Fichier 1</th><th>Fichier 2</th><th>Fusionné</th></tr></thead>
+        <tbody>
+          ${data[tabName].map(row => `
+            <tr>
+              <td class="${isDiff(row) ? 'highlight' : ''}">${format(row.file1)}</td>
+              <td class="${isDiff(row) ? 'highlight' : ''}">${format(row.file2)}</td>
+              <td>${format(row.merged)}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      `;
+      tabDiv.appendChild(table);
+      tabContents.appendChild(tabDiv);
+    });
+  }
+
+  function isDiff(row) {
+    return JSON.stringify(row.file1 || {}) !== JSON.stringify(row.file2 || {});
+  }
+
+  function format(obj) {
+    if (!obj) return "<i>null</i>";
+    return Object.entries(obj).map(([k, v]) => `<b>${k}</b>: ${v}`).join("<br>");
+  }
+
+  function switchPreviewTab(tabName) {
+    document.querySelectorAll(".tab-button").forEach(btn => {
+      btn.classList.toggle("active", btn.textContent === tabName);
+    });
+    document.querySelectorAll(".tab-content").forEach(div => {
+      div.classList.toggle("active", div.id === `tab-${tabName}`);
+    });
+  }
+
 
   function trackMerge(status, message = null) {
     const payload = { status };
