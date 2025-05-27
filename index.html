@@ -383,6 +383,13 @@
       background-color: #fff7dc;
     }
 
+    .tab-btn.active {
+      background-color: #007bff;
+      color: white;
+      font-weight: bold;
+    }
+
+
 
   </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -812,15 +819,28 @@
   function loadPreviewData(previewData) {
     document.getElementById("preview-section").classList.remove("hidden");
 
+    const fieldFilter = {
+      notes: ["Title", "Content"],
+      bookmarks: ["Title"],
+      tags: ["Name"]
+    };
+
     for (const [tableName, contents] of Object.entries(previewData)) {
       const tabEl = document.getElementById(`tab-${tableName.toLowerCase()}`);
       console.log(`🔍 Aperçu .${tableName} :`, contents);
 
-      // Vérification sécurisée
       if (!contents || !Array.isArray(contents.file1) || !Array.isArray(contents.file2)) {
         console.warn(`⛔ Onglet manquant ou données invalides pour ${tableName}`);
         continue;
       }
+
+      const fieldsToKeep = fieldFilter[tableName.toLowerCase()] || [];
+
+      const extractFields = (obj) => {
+        return fieldsToKeep.length > 0
+          ? Object.fromEntries(Object.entries(obj).filter(([k]) => fieldsToKeep.includes(k)))
+          : obj;
+      };
 
       tabEl.innerHTML = `
         <table style="width: 100%; border-collapse: collapse;">
@@ -836,8 +856,12 @@
               const item2 = contents.file2[index] || {};
               return `
                 <tr>
-                  <td style="padding: 6px; border: 1px solid #ccc;"><pre>${JSON.stringify(item1, null, 2)}</pre></td>
-                  <td style="padding: 6px; border: 1px solid #ccc;"><pre>${JSON.stringify(item2, null, 2)}</pre></td>
+                  <td style="padding: 6px; border: 1px solid #ccc;">
+                    <pre>${JSON.stringify(extractFields(item1), null, 2)}</pre>
+                  </td>
+                  <td style="padding: 6px; border: 1px solid #ccc;">
+                    <pre>${JSON.stringify(extractFields(item2), null, 2)}</pre>
+                  </td>
                   <td style="padding: 6px; border: 1px solid #ccc;">
                     <select data-table="${tableName}" data-index="${index}" class="merge-choice">
                       <option value="file1">Garder fichier 1</option>
@@ -854,13 +878,28 @@
   }
 
 
-  function showTab(tabName) {
-    const allTabs = document.querySelectorAll('.tab-content');
-    allTabs.forEach(tab => tab.classList.add('hidden'));
 
-    const currentTab = document.getElementById(`tab-${tabName}`);
-    if (currentTab) currentTab.classList.remove('hidden');
+  function showTab(tabName) {
+    // Masquer tous les contenus
+    document.querySelectorAll('.tab-content').forEach(tab => {
+      tab.classList.add('hidden');
+    });
+
+    // Afficher le contenu sélectionné
+    document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+
+    // Retirer la classe 'active' de tous les boutons
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.classList.remove('active');
+    });
+
+    // Ajouter la classe 'active' au bouton cliqué
+    const clickedBtn = Array.from(document.querySelectorAll('.tab-btn')).find(btn =>
+      btn.textContent.toLowerCase().includes(tabName)
+    );
+    if (clickedBtn) clickedBtn.classList.add('active');
   }
+
 
 
   function renderNotesPreview(data) {
