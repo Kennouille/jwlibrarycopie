@@ -479,17 +479,30 @@
     <button class="tab-btn" onclick="showTab('bookmarks')">🔖 Bookmarks</button>
     <button class="tab-btn" onclick="showTab('tags')">🏷️ Tags</button>
   </div>
+
   <div style="margin-top: 30px; text-align: center;">
     <button class="btn btn-primary" onclick="startMerge()">✅ Lancer la fusion finale</button>
   </div>
 
-
   <div id="preview-content">
-    <div id="tab-notes" class="tab-content"></div>
+    <div id="tab-notes" class="tab-content">
+      <!-- Ajoute ICI la table -->
+      <table class="preview-table">
+        <thead>
+          <tr>
+            <th>Note fichier 1</th>
+            <th>Note fichier 2</th>
+            <th>Choix</th>
+          </tr>
+        </thead>
+        <tbody id="notes-preview-body"></tbody>
+      </table>
+    </div>
     <div id="tab-bookmarks" class="tab-content hidden"></div>
     <div id="tab-tags" class="tab-content hidden"></div>
   </div>
 </div>
+
 
 
 <div id="errorDisplayWrapper" style="
@@ -782,6 +795,9 @@
 
       loadPreviewData(previewData);  // ← ici tu montres les tabs Notes, Bookmarks, Tags, etc.
 
+      renderNotesPreview(previewData.notes);
+
+
       await updateProgress(100, "Aperçu prêt", 5);
       document.getElementById('merge-summary').classList.remove('hidden');
       document.getElementById("progressDetails").textContent = "✅ Prévisualisation terminée.";
@@ -795,42 +811,44 @@
   }
 
 
-  function loadPreviewData(data) {
+  function loadPreviewData(previewData) {
     document.getElementById("preview-section").classList.remove("hidden");
 
-    for (const tab of ["notes", "bookmarks", "tags"]) {
-      const container = document.getElementById(`tab-${tab}`);
-      container.innerHTML = "";
+    for (const [tableName, contents] of Object.entries(previewData)) {
+      const tabEl = document.getElementById(`tab-${tableName.toLowerCase()}`);
+      if (!tabEl) continue;
 
-      const rows = data[tab] || [];
-      rows.forEach(row => {
-        const rowDiv = document.createElement("div");
-        rowDiv.classList.add("preview-row");
-
-        const cell1 = document.createElement("div");
-        cell1.className = "preview-cell";
-        cell1.textContent = JSON.stringify(row.file1 || {}, null, 2);
-        if (JSON.stringify(row.file1) !== JSON.stringify(row.file2)) cell1.classList.add("diff");
-
-        const cell2 = document.createElement("div");
-        cell2.className = "preview-cell";
-        cell2.textContent = JSON.stringify(row.file2 || {}, null, 2);
-        if (JSON.stringify(row.file1) !== JSON.stringify(row.file2)) cell2.classList.add("diff");
-
-        const merged = document.createElement("div");
-        merged.className = "preview-cell";
-        merged.textContent = JSON.stringify(row.merged || {}, null, 2);
-
-        rowDiv.appendChild(cell1);
-        rowDiv.appendChild(cell2);
-        rowDiv.appendChild(merged);
-
-        container.appendChild(rowDiv);
-      });
+      tabEl.innerHTML = `
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr style="background-color: #f0f0f0;">
+              <th style="width: 33%; padding: 8px;">📂 Fichier 1</th>
+              <th style="width: 33%; padding: 8px;">📂 Fichier 2</th>
+              <th style="width: 34%; padding: 8px;">✅ Choix</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${contents.file1.map((item1, index) => {
+              const item2 = contents.file2[index] || {};
+              return `
+                <tr>
+                  <td style="padding: 6px; border: 1px solid #ccc;"><pre>${JSON.stringify(item1, null, 2)}</pre></td>
+                  <td style="padding: 6px; border: 1px solid #ccc;"><pre>${JSON.stringify(item2, null, 2)}</pre></td>
+                  <td style="padding: 6px; border: 1px solid #ccc;">
+                    <select data-table="${tableName}" data-index="${index}" class="merge-choice">
+                      <option value="file1">Garder fichier 1</option>
+                      <option value="file2">Garder fichier 2</option>
+                      <option value="ignore">Ignorer</option>
+                    </select>
+                  </td>
+                </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      `;
     }
-
-    showTab("notes");
   }
+
 
   function showTab(tabName) {
     const allTabs = document.querySelectorAll('.tab-content');
@@ -842,6 +860,43 @@
     document.getElementById(`tab-${tabName}`).classList.remove('hidden');
     document.querySelector(`.tab-btn[onclick="showTab('${tabName}')"]`).classList.add('active');
   }
+
+  function renderNotesPreview(data) {
+    const tbody = document.getElementById("notes-preview-body");
+    tbody.innerHTML = "";
+
+    data.forEach((conflict, index) => {
+      const row = document.createElement("tr");
+
+      const td1 = document.createElement("td");
+      td1.textContent = conflict.file1?.content || "";
+      row.appendChild(td1);
+
+      const td2 = document.createElement("td");
+      td2.textContent = conflict.file2?.content || "";
+      row.appendChild(td2);
+
+      const tdChoice = document.createElement("td");
+      ["file1", "file2", "merge"].forEach(choice => {
+        const label = document.createElement("label");
+        label.style.marginRight = "10px";
+
+        const radio = document.createElement("input");
+        radio.type = "radio";
+        radio.name = `note-choice-${index}`;
+        radio.value = choice;
+        if (choice === "merge") radio.checked = true;
+
+        label.appendChild(radio);
+        label.appendChild(document.createTextNode(" " + choice));
+        tdChoice.appendChild(label);
+      });
+
+      row.appendChild(tdChoice);
+      tbody.appendChild(row);
+    });
+  }
+
 
 
 
