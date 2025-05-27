@@ -155,72 +155,54 @@ def generate_preview_data(file1_db, file2_db):
 
 @app.route('/prepare-preview', methods=['POST'])
 def prepare_preview():
-    print("📦 Préparation de l'aperçu comparatif en cours...")
+    try:
+        file1_path = os.path.join(UPLOAD_FOLDER, "userData1.db")
+        file2_path = os.path.join(UPLOAD_FOLDER, "userData2.db")
 
-    file1_path = os.path.join(EXTRACT_FOLDER, "file1_extracted", "userData.db")
-    file2_path = os.path.join(EXTRACT_FOLDER, "file2_extracted", "userData.db")
+        if not os.path.exists(file1_path) or not os.path.exists(file2_path):
+            return jsonify({"error": "Fichiers non trouvés"}), 400
 
-    if not os.path.exists(file1_path) or not os.path.exists(file2_path):
-        return jsonify({"error": "Les fichiers extraits sont introuvables"}), 400
+        conn1 = sqlite3.connect(file1_path)
+        conn2 = sqlite3.connect(file2_path)
 
-    def fetch_table_data(db_path, table, fields, key="NoteGuid"):
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        try:
-            cursor.execute(f"SELECT {key}, {', '.join(fields)} FROM {table}")
-            rows = cursor.fetchall()
-        except Exception as e:
-            print(f"❌ Erreur dans {table} ({db_path}):", e)
-            return {}
-        finally:
-            conn.close()
+        def extract_table(conn, table_name):
+            cursor = conn.cursor()
+            cursor.execute(f"SELECT * FROM {table_name}")
+            columns = [desc[0] for desc in cursor.description]
+            return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-        data = {}
-        for row in rows:
-            row_dict = dict(zip([key] + fields, row))
-            data[row[0]] = row_dict
-        return data
+        # Tu extrais chaque table
+        notes1 = extract_table(conn1, "Note")
+        notes2 = extract_table(conn2, "Note")
+        bookmarks1 = extract_table(conn1, "Bookmark")
+        bookmarks2 = extract_table(conn2, "Bookmark")
+        tags1 = extract_table(conn1, "Tag")
+        tags2 = extract_table(conn2, "Tag")
 
-    preview_data = {}
+        conn1.close()
+        conn2.close()
 
-    preview_targets = [
-        ("notes", "Note", ["Title", "Content", "LastModified", "UserMarkId"], "NoteGuid"),
-        ("bookmarks", "Bookmark", ["Title", "BlockId", "LastModified"], "BookmarkId"),
-        ("tags", "Tag", ["Name"], "TagId")
-    ]
+        # Tu renvoies les données sous la bonne structure
+        response = {
+            "notes": {
+                "file1": notes1,
+                "file2": notes2
+            },
+            "bookmarks": {
+                "file1": bookmarks1,
+                "file2": bookmarks2
+            },
+            "tags": {
+                "file1": tags1,
+                "file2": tags2
+            }
+        }
 
-    for key, table, fields, id_field in preview_targets:
-        data1 = fetch_table_data(file1_path, table, fields, id_field)
-        data2 = fetch_table_data(file2_path, table, fields, id_field)
+        return jsonify(response)
 
-        all_ids = set(data1.keys()).union(data2.keys())
-        merged_rows = []
-
-        for row_id in all_ids:
-            row1 = data1.get(row_id)
-            row2 = data2.get(row_id)
-
-            # tentative de merge automatique = garder le plus récent si date dispo
-            merged = None
-            if row1 and not row2:
-                merged = row1
-            elif row2 and not row1:
-                merged = row2
-            elif row1 and row2:
-                lm1 = row1.get("LastModified", "")
-                lm2 = row2.get("LastModified", "")
-                merged = row2 if lm2 > lm1 else row1
-
-            merged_rows.append({
-                "id": row_id,
-                "file1": row1,
-                "file2": row2,
-                "merged": merged
-            })
-
-        preview_data[key] = merged_rows
-
-    return jsonify(preview_data), 200
+    except Exception as e:
+        print("Erreur /prepare-preview:", str(e))
+        return jsonify({"error": str(e)}), 500
 
 
 def compare_notes_with_preview(file1_db, file2_db):
