@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fusionner Fichiers JW Library</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      color: #333;
+    }
+
+    .container {
+      background-color: #f9f9f9;
+      border-radius: 10px;
+      padding: 25px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    h2 {
+      color: #2c3e50;
+      text-align: center;
+      margin-bottom: 25px;
+    }
+
+    label {
+      display: block;
+      margin: 15px 0 5px;
+      font-weight: bold;
+    }
+
+    input[type="file"], input[type="datetime-local"] {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      background-color: white;
+    }
+
+    button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      width: 100%;
+      margin: 20px 0;
+      transition: background-color 0.3s;
+    }
+
+    button:hover {
+      background-color: #2980b9;
+    }
+
+    #progressContainer {
+      width: 100%;
+      background-color: #ecf0f1;
+      border-radius: 5px;
+      margin: 20px 0;
+      height: 30px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    #progressBar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #3498db, #2ecc71);
+      transition: width 0.3s ease-out;
+    }
+
+    #progressText {
+      position: absolute;
+      width: 100%;
+      text-align: center;
+      line-height: 30px;
+      color: #2c3e50;
+      font-weight: bold;
+    }
+
+    #progressDetails {
+      margin-top: 5px;
+      font-size: 14px;
+      color: #7f8c8d;
+      min-height: 20px;
+      text-align: center;
+    }
+
+    .step-indicator {
+      display: flex;
+      justify-content: space-between;
+      margin: 25px 0 15px;
+      position: relative;
+    }
+
+    .step-indicator::before {
+      content: "";
+      position: absolute;
+      top: 15px;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background-color: #ecf0f1;
+      z-index: 0;
+    }
+
+    .step {
+      text-align: center;
+      z-index: 1;
+      background-color: #f9f9f9;
+      padding: 0 10px;
+    }
+
+    .step .step-circle {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background-color: #bdc3c7;
+      color: white;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 5px;
+    }
+
+    .step.completed .step-circle {
+      background-color: #2ecc71;
+    }
+
+    .step.active .step-circle {
+      background-color: #3498db;
+      animation: pulse 1.5s infinite;
+    }
+
+    .conflict-container {
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      padding: 15px;
+      margin: 15px 0;
+      background-color: white;
+    }
+
+    .conflict-item {
+      margin-bottom: 10px;
+      padding: 10px;
+      border-bottom: 1px solid #eee;
+    }
+
+    #download {
+      display: block;
+      text-align: center;
+      padding: 15px;
+      background-color: #2ecc71;
+      color: white;
+      text-decoration: none;
+      border-radius: 5px;
+      margin-top: 20px;
+      font-weight: bold;
+      transition: background-color 0.3s;
+    }
+
+    #download:hover {
+      background-color: #27ae60;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* Animation de construction */
+    .file-construction {
+        margin: 20px 0;
+        text-align: center;
+    }
+
+    .construction-animation {
+        display: flex;
+        justify-content: center;
+        gap: 5px;
+        height: 30px;
+        margin-bottom: 10px;
+    }
+
+    .construction-block {
+        width: 6px;
+        background: linear-gradient(to top, #3498db, #2ecc71);
+        border-radius: 3px;
+        animation: blockGrow 1s infinite ease-in-out;
+        margin: 0 2px;
+    }
+
+    @keyframes blockGrow {
+        0%, 100% { height: 30%; }
+        50% { height: 80%; }
+    }
+
+    @keyframes blockWave {
+        0%, 100% { height: 20%; }
+        50% { height: 100%; opacity: 1; }
+    }
+
+    .construction-text {
+        font-size: 14px;
+        color: #7f8c8d;
+        font-style: italic;
+    }
+
+    .construction-dots::after {
+        content: '...';
+        animation: dotPulse 1.5s infinite steps(4);
+    }
+
+    @keyframes dotPulse {
+        0% { content: '.'; }
+        33% { content: '..'; }
+        66% { content: '...'; }
+    }
+
+    /* Remplacez votre CSS existant par ceci */
+    .progress-bar-animated {
+        position: relative;
+        overflow: hidden;
+    }
+
+    .progress-bar-animated::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(90deg,
+            rgba(255,255,255,0) 0%,
+            rgba(255,255,255,0.8) 50%,
+            rgba(255,255,255,0) 100%);
+        animation: shine 2s infinite;
+    }
+
+    @keyframes shine {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
+    }
+
+    .site-message {
+      max-width: 800px;
+      margin: 50px auto 20px;
+      font-size: 14px;
+      color: #555;
+      text-align: center;
+      padding: 0 15px;
+      line-height: 1.6;
+    }
+
+    .site-message a {
+      color: #2980b9;
+      text-decoration: none;
+    }
+
+    .site-message a:hover {
+      text-decoration: underline;
+    }
+
+    .footer {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 15px;
+      flex-wrap: wrap;
+      border-top: 1px solid #ccc;
+      padding: 15px;
+      max-width: 800px;
+      margin: 0 auto 30px;
+    }
+
+    .footer-logo {
+      height: 40px;
+    }
+
+    .footer-text {
+      font-size: 13px;
+      color: #888;
+    }
+
+    .security-box {
+      background-color: #eaeaea; /* plus foncé */
+      border-radius: 12px;
+      padding: 25px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+      margin-bottom: 30px;
+      font-size: 13.5px; /* légèrement plus petit */
+      color: #2c2c2c; /* texte un peu plus sombre */
+    }
+
+
+    .security-columns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+      margin-top: 15px;
+    }
+
+    .security-block p {
+      margin: 0 0 10px;
+    }
+
+    .security-block ul {
+      padding-left: 20px;
+      margin: 0;
+    }
+
+    .security-block ul li {
+      margin-bottom: 8px;
+    }
+
+    .security-box {
+      border: 1px solid #ccc;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    #manualDownloadMessage {
+      margin-bottom: 10px;
+      white-space: pre-wrap;
+      font-family: system-ui;
+    }
+
+    .btn-primary {
+      background-color: #007bff;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 4px;
+      border: none;
+      cursor: pointer;
+    }
+
+    .btn-primary:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+
+
+
+  </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fflate@0.7.4/umd/index.js"></script>
+</head>
+<body>
+<div class="container">
+  <h2>Fusionner des fichiers JW Library</h2>
+  <div style="text-align: right; margin-bottom: 20px;">
+    <img src="https://flagcdn.com/fr.svg" width="24" alt="fr" onclick="switchLanguage('fr')" style="cursor:pointer; margin-left: 5px;">
+    <img src="https://flagcdn.com/es.svg" width="24" alt="es" onclick="switchLanguage('es')" style="cursor:pointer; margin-left: 5px;">
+    <img src="https://flagcdn.com/gb.svg" width="24" alt="en" onclick="switchLanguage('en')" style="cursor:pointer; margin-left: 5px;">
+    <img src="https://flagcdn.com/it.svg" width="24" alt="it" onclick="switchLanguage('it')" style="cursor:pointer; margin-left: 5px;">
+    <img src="https://flagcdn.com/br.svg" width="24" alt="pt" onclick="switchLanguage('pt')" style="cursor:pointer; margin-left: 5px;">
+    <img src="https://flagcdn.com/de.svg" width="24" alt="de" onclick="switchLanguage('de')" style="cursor:pointer; margin-left: 5px;">
+  </div>
+  <div id="footer-security-fr" class="footer-security-box" style="display: none">...</div>
+  <div id="footer-security-en" class="footer-security-box" style="display: none">...</div>
+  <div id="footer-security-es" class="footer-security-box" style="display: none">...</div>
+  <div id="footer-security-it" class="footer-security-box" style="display: none">...</div>
+  <div id="footer-security-pt" class="footer-security-box" style="display: none">...</div>
+  <div id="footer-security-de" class="footer-security-box" style="display: none">...</div>
+
+
+
+  <label for="file1">Sélectionner le premier fichier (.jwlibrary) :</label>
+  <input type="file" id="file1" accept=".jwlibrary">
+
+  <label for="file2">Sélectionner le deuxième fichier (.jwlibrary) :</label>
+  <input type="file" id="file2" accept=".jwlibrary">
+
+  <label for="local_datetime">Date et heure locales actuelles :</label>
+  <input type="datetime-local" id="local_datetime" name="local_datetime" required>
+
+  <div class="step-indicator">
+    <div class="step" id="step1">
+      <div class="step-circle">1</div>
+      <div>Chargement</div>
+    </div>
+    <div class="step" id="step2">
+      <div class="step-circle">2</div>
+      <div>Extraction</div>
+    </div>
+    <div class="step" id="step3">
+      <div class="step-circle">3</div>
+      <div>Analyse</div>
+    </div>
+    <div class="step" id="step4">
+      <div class="step-circle">4</div>
+      <div>Détection</div>
+    </div>
+    <div class="step" id="step5">
+      <div class="step-circle">5</div>
+      <div>Prêt...</div>
+    </div>
+  </div>
+
+  <div id="progressContainer">
+    <div id="progressBar"></div>
+    <div id="progressText">0%</div>
+  </div>
+
+  <div id="progressDetails">Prêt à commencer...</div>
+
+  <div id="construction-container" class="file-construction hidden">
+      <div class="construction-animation" id="construction-animation">
+          <!-- Les blocs seront ajoutés par JavaScript -->
+      </div>
+      <div class="construction-text">
+          Ce process peut durer jusqu'à 4 minutes pour des gros fichiers<span class="construction-dots"></span>
+      </div>
+  </div>
+
+  <button id="mergeButton" onclick="startMerge()">Charger, Extraire & Analyser</button>
+
+  <div id="merge-summary" class="conflict-container hidden">
+    <h3>Résumé de la fusion</h3>
+    <p id="summary-text">
+      Les deux fichiers ont été analysés et fusionnés avec succès.
+      Les notes, surlignages, marque-pages, playlists et autres contenus identiques ont été conservés.
+      Les éléments uniques de chaque fichier ont été ajoutés automatiquement.
+    </p>
+  </div>
+  <div id="manualDownloadContainer" class="hidden" style="margin-top: 20px;">
+    <p id="manualDownloadMessage"></p>
+    <button id="manualDownloadBtn" class="btn btn-primary"></button>
+  </div>
+</div>
+<div id="errorDisplayWrapper" style="
+  max-width: 800px;
+  margin: 30px auto 0;
+  display: none;
+  text-align: center;
+">
+  <div id="errorDisplay" style="
+    color: #e74c3c;
+    font-weight: bold;
+    padding: 15px;
+    border: 1px solid #e74c3c;
+    border-radius: 5px;
+    background-color: #fdecea;
+    white-space: pre-wrap;
+    margin-bottom: 10px;
+  "></div>
+  <button onclick="copyError()" style="
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 5px;
+    cursor: pointer;
+  ">📋 Copier le message</button>
+</div>
+<div id="footer-message" class="site-message"></div>
+
+<footer class="footer">
+  <a href="https://wa.me/528118594482" target="_blank" title="Me contacter par WhatsApp">
+    <img src="images/Logo KM.png" alt="Logo KM" class="footer-logo">
+  </a>
+  <span id="footer-copy" class="footer-text"></span>
+</footer>
+
+
+<script type="module">
+  import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+
+  const supabase = createClient("https://mngggybayjooqkzbhvqy.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1uZ2dneWJheWpvb3FremJodnF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjY2MTU3NDgsImV4cCI6MjA0MjE5MTc0OH0.lnOqnq1AwN41g4xJ5O9oNIPBQqXYJkSrRhJ3osXtcsk");
+
+  const BASE_URL = "https://web-production-a18d.up.railway.app/";
+  let currentProgress = 0;
+
+   async function updateProgress(targetPercent, message, step) {
+    return new Promise(resolve => {
+      const startPercent = currentProgress;
+      const duration = 500;
+      const startTime = performance.now();
+
+      const animate = (currentTime) => {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        currentProgress = startPercent + (targetPercent - startPercent) * progress;
+
+        document.getElementById("progressBar").style.width = currentProgress + "%";
+        document.getElementById("progressText").textContent = Math.round(currentProgress) + "%";
+        if (message) document.getElementById("progressDetails").textContent = message;
+
+        if (step) updateStepIndicator(step, currentProgress);
+
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          resolve();
+        }
+      };
+
+      requestAnimationFrame(animate);
+    });
+  }
+
+  function showError(message) {
+    const wrapper = document.getElementById("errorDisplayWrapper");
+    const el = document.getElementById("errorDisplay");
+    el.textContent = message;
+    wrapper.style.display = "block";
+  }
+
+  function copyError() {
+    const text = document.getElementById("errorDisplay").textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      alert("Message copié !");
+    });
+  }
+
+  function updateStepIndicator(step) {
+    const allSteps = document.querySelectorAll('.step');
+    allSteps.forEach((el, index) => {
+      el.classList.remove('active', 'completed');
+      if (index + 1 < step) el.classList.add('completed');
+      else if (index + 1 === step) el.classList.add('active');
+    });
+  }
+
+  function appendToMergeLog(text, isError = false) {
+    const log = document.getElementById('merge-log');
+    if (!log) return;
+
+    const entry = document.createElement('div');
+    entry.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
+    entry.style.color = isError ? '#ff6b6b' : '#adb5bd';
+    log.appendChild(entry);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  async function simulateProcessing(duration, targetPercent, message, step) {
+    const startPercent = currentProgress;
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < duration) {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const current = startPercent + (targetPercent - startPercent) * progress;
+
+      await updateProgress(current, message, step);
+      await new Promise(r => setTimeout(r, 50));
+    }
+  }
+
+  async function uploadWithProgress(url, formData) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const percent = Math.round((e.loaded / e.total) * 30);
+          updateProgress(20 + percent, `Upload: ${Math.round(e.loaded / 1024)}KB/${Math.round(e.total / 1024)}KB`, 2);
+        }
+      };
+
+      xhr.onload = () => resolve(xhr.response);
+      xhr.onerror = () => reject(new Error("Upload failed"));
+
+      xhr.open("POST", url);
+      xhr.setRequestHeader("ngrok-skip-browser-warning", "true");
+      xhr.responseType = "json";
+      xhr.send(formData);
+    });
+  }
+
+  function showConstructionAnimation() {
+      const container = document.getElementById('construction-container');
+      const animationEl = document.getElementById('construction-animation');
+
+      // Créer 10 barres animées
+      animationEl.innerHTML = '';
+      for (let i = 0; i < 10; i++) {
+          const block = document.createElement('div');
+          block.className = 'construction-block';
+          block.style.animationDelay = `${i * 0.2}s`;
+          animationEl.appendChild(block);
+      }
+
+      container.classList.remove('hidden');
+  }
+
+  async function hashBlob(blob) {
+      const buffer = await blob.arrayBuffer();
+      const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
+      return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+  async function logMergeToSupabase(status, message = "") {
+    let country = "unknown";
+    let city = "unknown";
+
+    try {
+      const res = await fetch("https://ipapi.co/json/");
+      if (res.ok) {
+        const json = await res.json();
+        country = json.country || "unknown"; // Exemple: "FR"
+        city = json.city || "unknown";       // Exemple: "Lyon"
+      }
+    } catch (e) {
+      console.warn("🌐 Impossible de récupérer la localisation :", e.message);
+    }
+
+    const logEntry = {
+      status,
+      message,
+      lang: window.currentLang || "unknown",
+      platform: navigator.platform || "unknown",
+      browser: navigator.userAgent || "unknown",
+      country,
+      city
+    };
+
+    const { data, error } = await supabase
+      .from("merge_logs")
+      .insert([logEntry]);
+
+    if (error) {
+      console.warn("❌ Supabase log failed:", error.message);
+    } else {
+      console.log("✅ Supabase log enregistré:", data);
+    }
+  }
+
+
+  async function startMerge() {
+    try {
+      const file1 = document.getElementById('file1').files[0];
+      const file2 = document.getElementById('file2').files[0];
+      const localDatetime = document.getElementById('local_datetime').value;
+
+      if (!file1 || !file2)
+        throw new Error(translations[window.currentLang].errors.selectFiles);
+      if (!file1.name.endsWith('.jwlibrary') || !file2.name.endsWith('.jwlibrary'))
+        throw new Error(translations[window.currentLang].errors.extension);
+      if (!localDatetime)
+        throw new Error(translations[window.currentLang].errors.missingDate);
+
+
+      const mergeButton = document.getElementById('mergeButton');
+      mergeButton.disabled = true;
+
+      await updateProgress(5, "Préparation des fichiers...", 1);
+      await simulateProcessing(800, 20, "Chargement des fichiers...", 1);
+
+      const zip1 = await JSZip.loadAsync(file1);
+      const zip2 = await JSZip.loadAsync(file2);
+
+      const userData1 = await zip1.file("userData.db").async("blob");
+      const userData2 = await zip2.file("userData.db").async("blob");
+
+      const maxCombinedSize = 95 * 1024 * 1024;
+      if (userData1.size + userData2.size > maxCombinedSize) {
+        throw new Error("Les fichiers userData.db sont trop volumineux (plus de 95MB combinés).");
+      }
+
+      const mediaExtensions = [".jpg", ".jpeg", ".png", ".mp4"];
+      const media1 = [];
+      const media2 = [];
+
+      const hashFile = async (file) => {
+        const buffer = await file.async("arraybuffer");
+        const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
+        return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+      };
+
+      const collectMedia = async (zip, targetList, skipNames = ["userData.db", "userData.db-shm", "userData.db-wal"]) => {
+        const skipSet = new Set(skipNames.map(n => n.toLowerCase()));
+        for (const file of Object.values(zip.files)) {
+          const name = file.name.toLowerCase();
+          if ([...skipSet].some(skip => name.endsWith(skip))) continue;
+          const hash = await hashFile(file);
+          targetList.push({ name: file.name, file, hash });
+        }
+      };
+
+      await collectMedia(zip1, media1);
+      await collectMedia(zip2, media2);
+
+      const hashSet1 = new Set(media1.map(m => m.hash));
+      const uniqueMedia2 = media2.filter(m => !hashSet1.has(m.hash));
+      const combinedMedia = [...media1, ...uniqueMedia2];
+
+      window.mediaToInclude = await Promise.all(
+        combinedMedia.map(async (media) => ({
+          name: media.name,
+          file: await media.file.async("blob"),
+          hash: media.hash
+        }))
+      );
+
+      window.userData1 = userData1;
+      window.userData2 = userData2;
+
+      const formData = new FormData();
+      formData.append("file1", new File([userData1], "userData1.db"));
+      formData.append("file2", new File([userData2], "userData2.db"));
+
+      await updateProgress(20, "Début de l'upload...", 2);
+      await uploadWithProgress(`${BASE_URL}/upload`, formData);
+
+      await updateProgress(50, "Extraction des données...", 3);
+      await simulateProcessing(3000, 80, "Analyse des contenus...", 3);
+
+      await updateProgress(90, "Fusion en cours...", 4);
+      appendToMergeLog("Fusion en cours, veuillez patienter...");
+
+      const progressBar = document.getElementById('progressBar');
+      progressBar.classList.add('progress-bar-animated');
+      document.getElementById('construction-container').classList.remove('hidden');
+
+      const response = await fetch(`${BASE_URL}/merge`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true"
+        },
+        body: JSON.stringify({ local_datetime: localDatetime })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        showError(errorText || translations[window.currentLang].errors.mergeFailed);
+        throw new Error("Erreur backend : " + errorText);
+      }
+
+      const result = await response.json();
+
+      if (result.merge_status !== "done") {
+        throw new Error("La fusion n’a pas été finalisée correctement.");
+      }
+
+      progressBar.classList.remove('progress-bar-animated');
+      document.getElementById('construction-container').classList.add('hidden');
+
+      await updateProgress(92, "Création du fichier ZIP final...", 5);
+
+      await updateProgress(95, "Reconstruction du fichier .jwlibrary...", 5);
+      console.log("🚀 rebuildFinalZip() va être appelé");
+
+      await rebuildFinalZip();
+      trackMerge("success");
+      await logMergeToSupabase("success");
+
+      await updateProgress(100, "Fichier prêt", 5);
+      progressBar.classList.remove('progress-bar-animated');
+
+      const step5 = document.getElementById("step5");
+      step5.classList.remove("active");
+      step5.classList.add("completed");
+
+      document.getElementById("progressDetails").textContent = "Fichier prêt";
+
+      const summaryText = document.getElementById('summary-text');
+      summaryText.innerHTML =
+        `La fusion est terminée. Les données identiques (notes, surlignages, marques-pages, playlists, etc.) ont été conservées.
+        Les éléments uniques de chaque fichier ont été ajoutés.<br><br>
+        <strong>💡 Une fois le téléchargement automatique effectué, tous les fichiers sont immédiatement effacés. Si le téléchargement ne s'est pas bien passé, actualise la page et renouvelle l'opération en entier.</strong>`;
+
+      document.getElementById('merge-summary').classList.remove('hidden');
+
+      document.getElementById("progressDetails").textContent = "✅ Téléchargement terminé ou en cours.";
+    } catch (error) {
+      console.error("Erreur:", error);
+      showError(error.message);
+      trackMerge("error", error.message);
+      await logMergeToSupabase("error", error.message);
+
+      await updateProgress(currentProgress, `Erreur: ${error.message}`);
+      document.getElementById('mergeButton').disabled = false;
+    }
+  }
+
+  function trackMerge(status, message = null) {
+    const payload = { status };
+    if (status === "error" && message) {
+      payload.message = message;
+    }
+
+    fetch(`${BASE_URL}/track-merge`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }).then(res => {
+      if (!res.ok) console.warn("❌ Erreur d'envoi des stats de fusion");
+    }).catch(err => {
+      console.warn("❌ Erreur réseau pour les stats :", err);
+    });
+  }
+
+
+  async function rebuildFinalZip() {
+    try {
+      console.log("📥 " + translations[window.currentLang].messages.downloadingFiles);
+
+      const isAppleDevice = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      if (isAppleDevice) {
+        const manualContainer = document.getElementById("manualDownloadContainer");
+        const manualMessage = document.getElementById("manualDownloadMessage");
+        const manualBtn = document.getElementById("manualDownloadBtn");
+
+        manualContainer.classList.remove("hidden");
+        manualMessage.textContent = translations[window.currentLang].messages.preparingDownload;
+        manualBtn.textContent = translations[window.currentLang].actions.manualDownload;
+      }
+
+      const fetchFile = async (name) => {
+        const res = await fetch(`${BASE_URL}/download/${name}?ngrok-skip-browser-warning=true`);
+        if (!res.ok) throw new Error(`${translations[window.currentLang].errors.fetchError} ${name}`);
+        return await res.blob();
+      };
+
+      const [debugBlob, shmBlob, walBlob] = await Promise.all([
+        fetchFile("debug_cleaned_before_copy.db"),
+        fetchFile("debug_cleaned_before_copy.db-shm"),
+        fetchFile("debug_cleaned_before_copy.db-wal")
+      ]);
+
+      console.log("✅ " + translations[window.currentLang].messages.filesDownloaded);
+
+      const zip = new JSZip();
+      zip.file("userData.db", debugBlob, { binary: true, compression: "DEFLATE" });
+      zip.file("userData.db-shm", shmBlob, { binary: true, compression: "DEFLATE" });
+      zip.file("userData.db-wal", walBlob, { binary: true, compression: "DEFLATE" });
+
+      if (window.mediaToInclude?.length) {
+        for (const media of window.mediaToInclude) {
+          zip.file(media.name, media.file, { binary: true, compression: "DEFLATE" });
+        }
+      }
+
+      console.log("📦 " + translations[window.currentLang].messages.creatingArchive);
+
+      const finalZip = await zip.generateAsync({
+        type: "blob",
+        compression: "DEFLATE",
+        compressionOptions: { level: isAppleDevice ? 6 : 9 }
+      });
+
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const filename = `UserdataBackup_${yyyy}-${mm}-${dd}_merged.jwlibrary`;
+
+      window.generatedZipBlob = finalZip;
+      window.generatedFilename = filename;
+
+      if (!isAppleDevice) {
+        // Téléchargement automatique pour les autres plateformes
+        const zipUrl = URL.createObjectURL(finalZip);
+        const link = document.createElement("a");
+        link.href = zipUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+          document.body.removeChild(link);
+          URL.revokeObjectURL(zipUrl);
+        }, 100);
+        console.log("🎯 " + translations[window.currentLang].messages.autoDownloadStarted);
+      } else {
+        // Pour iOS, on s'assure que le bouton manuel est configuré
+        const manualBtn = document.getElementById("manualDownloadBtn");
+        manualBtn.onclick = () => {
+          const manualUrl = URL.createObjectURL(finalZip);
+          const manualLink = document.createElement("a");
+          manualLink.href = manualUrl;
+          manualLink.download = filename;
+          document.body.appendChild(manualLink);
+          manualLink.click();
+          setTimeout(() => {
+            document.body.removeChild(manualLink);
+            URL.revokeObjectURL(manualUrl);
+          }, 3000);
+        };
+      }
+
+    } catch (error) {
+      console.error("❌ " + translations[window.currentLang].errors.operationFailed, error);
+
+      if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+        const manualMessage = document.getElementById("manualDownloadMessage");
+        if (manualMessage) {
+          manualMessage.textContent = `${translations[window.currentLang].errors.operationFailed}: ${error.message}`;
+          manualMessage.style.color = "#f44336";
+        }
+      }
+    }
+  }
+
+  const translations = {
+    fr: {
+      title: "Fusionner des fichiers JW Library",
+      file1: "Sélectionner le premier fichier (.jwlibrary) :",
+      file2: "Sélectionner le deuxième fichier (.jwlibrary) :",
+      datetime: "Date et heure locales actuelles :",
+      steps: ["Chargement", "Extraction", "Analyse", "Détection", "Prêt..."],
+      mergeButton: "Charger, Extraire & Analyser",
+      summary: `La fusion est terminée. Les données identiques (notes, surlignages, marques-pages, playlists, etc.) ont été conservées.
+  Les éléments uniques de chaque fichier ont été ajoutés.<br><br>
+  <strong>💡 Une fois le téléchargement automatique effectué, tous les fichiers sont immédiatement effacés. Si le téléchargement ne s'est pas bien passé, actualise la page et renouvelle l'opération en entier.</strong>`,
+      progressReady: "Prêt à commencer...",
+      final: "✅ Téléchargement terminé ou en cours.",
+      errors: {
+        selectFiles: "Veuillez sélectionner deux fichiers .jwlibrary",
+        extension: "Les deux fichiers doivent avoir l'extension .jwlibrary",
+        missingDate: "Veuillez indiquer la date et l'heure locales actuelles",
+        mergeFailed: "La fusion n’a pas été finalisée correctement.",
+        fetchError: "Erreur lors du téléchargement de"
+      },
+      footer: {
+        message: `Ce site est complètement gratuit comme tout ce que fait l'organisation de Jéhovah.<br>
+  Si tu es content de son utilisation, n'hésite pas à faire un don sur <a href="https://donate.jw.org" target="_blank">DONATE.JW.ORG</a>.<br>
+  Tu peux aussi aider aux quelques frais de développement et du serveur en m'envoyant un message. Clique sur le logo et tu seras redirigé vers mon numéro de portable.`,
+        copyright: "© 2025 — Tous droits réservés"
+      },
+      manualDownload: {
+        message: "💡 Si le téléchargement ne s'est pas effectué, appuie sur le bouton ci-dessous.",
+        button: "📥 Télécharger manuellement le fichier"
+      },
+      messages: {
+        downloadingFiles: "Téléchargement des fichiers .db, .shm, .wal...",
+        filesDownloaded: "Fichiers téléchargés avec succès",
+        creatingArchive: "Création de l'archive finale...",
+        autoDownloadStarted: "Téléchargement automatique déclenché",
+        preparingDownload: "Préparation du téléchargement manuel..."
+      },
+      actions: {
+        manualDownload: "📥 Télécharger manuellement le fichier"
+      },
+      footerSecurity: `
+        <div class="security-box">
+          <h3>🔐 <strong>AVANT DE COMMENCER :</strong> Sécurité & Confidentialité des Fichiers</h3>
+          <div class="security-columns">
+            <div class="security-block">
+              <p>✅ Ce site ne stocke <strong>aucun fichier de manière permanente</strong>.</p>
+              <ul>
+                <li>Fichiers traités en mémoire ou temporairement</li>
+                <li>Supprimés après la fusion</li>
+                <li>Fichier final renvoyé via HTTPS</li>
+              </ul>
+            </div>
+            <div class="security-block">
+              <p>⚠️ Le serveur est <strong>stateless</strong> :</p>
+              <ul>
+                <li>Sessions indépendantes</li>
+                <li>Personne ne peut accéder à tes fichiers</li>
+                <li>Aucun lien sauvegardé</li>
+              </ul>
+              <p>🌸 Données effacées après inactivité ou redémarrage</p>
+            </div>
+          </div>
+        </div>
+      `
+    },
+    en: {
+      title: "Merge JW Library files",
+      file1: "Select the first file (.jwlibrary):",
+      file2: "Select the second file (.jwlibrary):",
+      datetime: "Current local date and time:",
+      steps: ["Loading", "Extracting", "Analyzing", "Detecting", "Ready..."],
+      mergeButton: "Load, Extract & Analyze",
+      summary: `Merge complete. Identical data (notes, highlights, bookmarks, playlists, etc.) has been preserved.
+  Unique elements from each file have been added.<br><br>
+  <strong>💡 Once the automatic download is complete, all files are immediately deleted. If the download fails, refresh the page and repeat the process.</strong>`,
+      progressReady: "Ready to start...",
+      final: "✅ Download complete or in progress.",
+      errors: {
+        selectFiles: "Please select two .jwlibrary files",
+        extension: "Both files must have the .jwlibrary extension",
+        missingDate: "Please provide the current local date and time",
+        mergeFailed: "The merge was not completed successfully.",
+        fetchError: "Error while downloading"
+      },
+      footer: {
+        message: `This site is completely free, just like everything from Jehovah's organization.<br>
+  If you find it useful, feel free to donate at <a href="https://donate.jw.org" target="_blank">DONATE.JW.ORG</a>.<br>
+  You can also help with some development and server costs by sending me a message. Click on the logo to be redirected to my phone number.`,
+        copyright: "© 2025 — All rights reserved"
+      },
+      manualDownload: {
+        message: "💡 If the download didn’t start, click the button below.",
+        button: "📥 Download the file manually"
+      },
+      messages: {
+        downloadingFiles: "Téléchargement des fichiers .db, .shm, .wal...",
+        filesDownloaded: "Fichiers téléchargés avec succès",
+        creatingArchive: "Création de l'archive finale...",
+        autoDownloadStarted: "Téléchargement automatique déclenché",
+        preparingDownload: "Préparation du téléchargement manuel..."
+      },
+      actions: {
+        manualDownload: "📥 Télécharger manuellement le fichier"
+      },
+      footerSecurity: `
+        <div class="security-box">
+          <h3>🔐 <strong>BEFORE YOU START:</strong> File Security & Privacy</h3>
+          <div class="security-columns">
+            <div class="security-block">
+              <p>✅ This site does <strong>not store any file permanently</strong>.</p>
+              <ul>
+                <li>Files handled in memory or temporarily</li>
+                <li>Deleted after merge</li>
+                <li>Final file sent via HTTPS</li>
+              </ul>
+            </div>
+            <div class="security-block">
+              <p>⚠️ The server is <strong>stateless</strong>:</p>
+              <ul>
+                <li>Each session is independent</li>
+                <li>No one can access your files</li>
+                <li>No links are saved</li>
+              </ul>
+              <p>🌸 Data erased after inactivity or restart</p>
+            </div>
+          </div>
+        </div>
+      `
+    },
+    es: {
+      title: "Fusionar archivos de JW Library",
+      file1: "Selecciona el primer archivo (.jwlibrary):",
+      file2: "Selecciona el segundo archivo (.jwlibrary):",
+      datetime: "Fecha y hora local actual:",
+      steps: ["Carga", "Extracción", "Análisis", "Detección", "Listo..."],
+      mergeButton: "Cargar, Extraer y Analizar",
+      summary: `La fusión ha finalizado. Los datos idénticos (notas, resaltados, marcadores, listas de reproducción, etc.) se conservaron.
+  Los elementos únicos de cada archivo se han añadido.<br><br>
+  <strong>💡 Una vez completada la descarga automática, todos los archivos se eliminan inmediatamente. Si la descarga falla, actualiza la página y repite el proceso completo.</strong>`,
+      progressReady: "Listo para comenzar...",
+      final: "✅ Descarga completada o en curso.",
+      errors: {
+        selectFiles: "Por favor selecciona dos archivos .jwlibrary",
+        extension: "Ambos archivos deben tener la extensión .jwlibrary",
+        missingDate: "Por favor indica la fecha y hora local actual",
+        mergeFailed: "La fusión no se completó correctamente.",
+        fetchError: "Error al descargar"
+      },
+      footer: {
+        message: `Este sitio es completamente gratuito, como todo lo que hace la organización de Jehová.<br>
+  Si estás contento con su uso, no dudes en hacer una donación en <a href="https://donate.jw.org" target="_blank">DONATE.JW.ORG</a>.<br>
+  También puedes ayudar con algunos gastos de desarrollo y del servidor enviándome un mensaje. Haz clic en el logo y serás redirigido a mi número de celular.`,
+        copyright: "© 2025 — Todos los derechos reservados"
+      },
+      manualDownload: {
+        message: "💡 Si la descarga no se realizó, haz clic en el botón de abajo.",
+        button: "📥 Descargar el archivo manualmente"
+      },
+      messages: {
+        downloadingFiles: "Descargando archivos .db, .shm, .wal...",
+        filesDownloaded: "Archivos descargados correctamente",
+        creatingArchive: "Creando el archivo final...",
+        autoDownloadStarted: "Descarga automática iniciada",
+        preparingDownload: "Preparando descarga manual..."
+      },
+      actions: {
+        manualDownload: "📥 Descargar el archivo manualmente"
+      },
+      footerSecurity: `
+        <div class="security-box">
+          <h3>🔐 <strong>ANTES DE EMPEZAR:</strong> Seguridad y Confidencialidad de los Archivos</h3>
+          <div class="security-columns">
+            <div class="security-block">
+              <p>✅ Este sitio <strong>no guarda ningún archivo de forma permanente</strong>.</p>
+              <ul>
+                <li>Procesados en memoria o temporalmente</li>
+                <li>Eliminados tras la fusión</li>
+                <li>Archivo final enviado por HTTPS</li>
+              </ul>
+            </div>
+            <div class="security-block">
+              <p>⚠️ El servidor es <strong>stateless</strong>:</p>
+              <ul>
+                <li>Cada sesión es aislada</li>
+                <li>Nadie puede acceder a tus archivos</li>
+                <li>No se guarda ningún enlace</li>
+              </ul>
+              <p>🌸 Datos eliminados tras inactividad o reinicio</p>
+            </div>
+          </div>
+        </div>
+      `
+    },
+    it: {
+      title: "Unisci file JW Library",
+      file1: "Seleziona il primo file (.jwlibrary):",
+      file2: "Seleziona il secondo file (.jwlibrary):",
+      datetime: "Data e ora locale attuali:",
+      steps: ["Caricamento", "Estrazione", "Analisi", "Rilevamento", "Pronto..."],
+      mergeButton: "Carica, Estrai e Analizza",
+      summary: `L'unione è completata. I dati identici (note, evidenziazioni, segnalibri, playlist, ecc.) sono stati conservati.
+  Gli elementi unici di ciascun file sono stati aggiunti.<br><br>
+  <strong>💡 Una volta completato il download automatico, tutti i file vengono immediatamente eliminati. Se il download fallisce, aggiorna la pagina e ripeti il processo.</strong>`,
+      progressReady: "Pronto per iniziare...",
+      final: "✅ Download completato o in corso.",
+      errors: {
+        selectFiles: "Seleziona due file .jwlibrary",
+        extension: "Entrambi i file devono avere l'estensione .jwlibrary",
+        missingDate: "Inserisci la data e ora locali attuali",
+        mergeFailed: "L'unione non è stata completata correttamente.",
+        fetchError: "Errore durante il download di"
+      },
+      footer: {
+        message: `Questo sito è completamente gratuito, proprio come tutto ciò che fa l'organizzazione di Geova.<br>
+  Se lo trovi utile, non esitare a fare una donazione su <a href="https://donate.jw.org" target="_blank">DONATE.JW.ORG</a>.<br>
+  Puoi anche contribuire con alcune spese di sviluppo e del server inviandomi un messaggio. Clicca sul logo e verrai reindirizzato al mio numero di telefono.`,
+        copyright: "© 2025 — Tutti i diritti riservati"
+      },
+      manualDownload: {
+        message: "💡 Se il download non è iniziato, fai clic sul pulsante qui sotto.",
+        button: "📥 Scarica il file manualmente"
+      },
+      messages: {
+        downloadingFiles: "Download dei file .db, .shm, .wal in corso...",
+        filesDownloaded: "File scaricati con successo",
+        creatingArchive: "Creazione dell’archivio finale...",
+        autoDownloadStarted: "Download automatico avviato",
+        preparingDownload: "Preparazione del download manuale..."
+      },
+      actions: {
+        manualDownload: "📥 Scarica il file manualmente"
+      },
+      footerSecurity: `
+        <div class="security-box">
+          <h3>🔐 <strong>PRIMA DI INIZIARE:</strong> Sicurezza e Riservatezza dei File</h3>
+          <div class="security-columns">
+            <div class="security-block">
+              <p>✅ Questo sito <strong>non conserva file in modo permanente</strong>.</p>
+              <ul>
+                <li>Elaborati in memoria o temporanei</li>
+                <li>Eliminati dopo la fusione</li>
+                <li>File finale inviato via HTTPS</li>
+              </ul>
+            </div>
+            <div class="security-block">
+              <p>⚠️ Il server è <strong>stateless</strong>:</p>
+              <ul>
+                <li>Sessioni isolate</li>
+                <li>Nessuno può accedere ai tuoi file</li>
+                <li>Nessun link salvato</li>
+              </ul>
+              <p>🌸 Dati cancellati dopo inattività o riavvio</p>
+            </div>
+          </div>
+        </div>
+      `
+    },
+    pt: {
+      title: "Mesclar arquivos JW Library",
+      file1: "Selecione o primeiro arquivo (.jwlibrary):",
+      file2: "Selecione o segundo arquivo (.jwlibrary):",
+      datetime: "Data e hora local atual:",
+      steps: ["Carregando", "Extraindo", "Analisando", "Detectando", "Pronto..."],
+      mergeButton: "Carregar, Extrair e Analisar",
+      summary: `A mesclagem foi concluída. Os dados idênticos (notas, destaques, marcadores, listas de reprodução, etc.) foram preservados.
+  Os elementos únicos de cada arquivo foram adicionados.<br><br>
+  <strong>💡 Assim que o download automático for concluído, todos os arquivos serão imediatamente excluídos. Se o download falhar, atualize a página e repita o processo.</strong>`,
+      progressReady: "Pronto para começar...",
+      final: "✅ Download concluído ou em andamento.",
+      errors: {
+        selectFiles: "Por favor selecione dois arquivos .jwlibrary",
+        extension: "Ambos os arquivos devem ter a extensão .jwlibrary",
+        missingDate: "Por favor informe a data e hora local atual",
+        mergeFailed: "A mesclagem não foi concluída com sucesso.",
+        fetchError: "Erro ao baixar"
+      },
+      footer: {
+        message: `Este site é totalmente gratuito, assim como tudo o que a organização de Jeová faz.<br>
+  Se você gostou de usá-lo, sinta-se à vontade para fazer uma doação em <a href="https://donate.jw.org" target="_blank">DONATE.JW.ORG</a>.<br>
+  Você também pode ajudar com alguns custos de desenvolvimento e servidor me enviando uma mensagem. Clique no logo e será redirecionado para o meu número de telefone.`,
+        copyright: "© 2025 — Todos os direitos reservados"
+      },
+      manualDownload: {
+        message: "💡 Se o download não foi iniciado, clique no botão abaixo.",
+        button: "📥 Baixar o arquivo manualmente"
+      },
+      messages: {
+        downloadingFiles: "Baixando arquivos .db, .shm, .wal...",
+        filesDownloaded: "Arquivos baixados com sucesso",
+        creatingArchive: "Criando o arquivo final...",
+        autoDownloadStarted: "Download automático iniciado",
+        preparingDownload: "Preparando o download manual..."
+      },
+      actions: {
+        manualDownload: "📥 Baixar o arquivo manualmente"
+      },
+      footerSecurity: `
+        <div class="security-box">
+          <h3>🔐 <strong>ANTES DE COMEÇAR:</strong> Segurança e Privacidade dos Arquivos</h3>
+          <div class="security-columns">
+            <div class="security-block">
+              <p>✅ Este site <strong>não armazena arquivos permanentemente</strong>.</p>
+              <ul>
+                <li>Processados em memória ou temporários</li>
+                <li>Apagados após a fusão</li>
+                <li>Arquivo final enviado por HTTPS</li>
+              </ul>
+            </div>
+            <div class="security-block">
+              <p>⚠️ O servidor é <strong>stateless</strong>:</p>
+              <ul>
+                <li>Cada sessão é isolada</li>
+                <li>Ninguém pode acessar seus arquivos</li>
+                <li>Nenhum link é salvo</li>
+              </ul>
+              <p>🌸 Dados apagados após inatividade ou reinício</p>
+            </div>
+          </div>
+        </div>
+      `
+    },
+    de: {
+      title: "JW Library-Dateien zusammenführen",
+      file1: "Erste Datei auswählen (.jwlibrary):",
+      file2: "Zweite Datei auswählen (.jwlibrary):",
+      datetime: "Aktuelles lokales Datum und Uhrzeit:",
+      steps: ["Laden", "Entpacken", "Analysieren", "Abgleichen", "Bereit..."],
+      mergeButton: "Laden, Entpacken & Analysieren",
+      summary: `Die Zusammenführung ist abgeschlossen. Identische Daten (Notizen, Hervorhebungen, Lesezeichen, Playlists usw.) wurden beibehalten.
+    Einzigartige Elemente aus beiden Dateien wurden hinzugefügt.<br><br>
+    <strong>💡 Nach dem automatischen Herunterladen werden alle Dateien sofort gelöscht. Falls das Herunterladen nicht funktioniert hat, lade die Seite neu und starte den Vorgang erneut.</strong>`,
+      progressReady: "Bereit zum Starten...",
+      final: "✅ Herunterladen abgeschlossen oder läuft.",
+      errors: {
+        selectFiles: "Bitte wähle zwei .jwlibrary-Dateien aus",
+        extension: "Beide Dateien müssen die Endung .jwlibrary haben",
+        missingDate: "Bitte gib das aktuelle lokale Datum und die Uhrzeit an",
+        mergeFailed: "Die Zusammenführung wurde nicht korrekt abgeschlossen.",
+        fetchError: "Fehler beim Herunterladen von"
+      },
+      manualDownload: {
+        message: "💡 Falls der Download nicht gestartet wurde, klicke auf den Button unten.",
+        button: "📥 Datei manuell herunterladen"
+      },
+      footer: {
+        message: `Diese Seite ist vollständig kostenlos, wie alles, was Jehovas Organisation bereitstellt.<br>
+    Wenn dir diese Seite gefällt, kannst du eine Spende auf <a href="https://donate.jw.org" target="_blank">DONATE.JW.ORG</a> machen.<br>
+    Du kannst auch bei den kleinen Entwicklungs- und Serverkosten helfen, indem du mir eine Nachricht schickst. Klicke auf das Logo, um zu meiner Telefonnummer weitergeleitet zu werden.`,
+        copyright: "© 2025 — Alle Rechte vorbehalten"
+      },
+      messages: {
+        downloadingFiles: "Lade .db-, .shm- und .wal-Dateien herunter...",
+        filesDownloaded: "Dateien erfolgreich heruntergeladen",
+        creatingArchive: "Erstelle das endgültige Archiv...",
+        autoDownloadStarted: "Automatischer Download gestartet",
+        preparingDownload: "Manueller Download wird vorbereitet..."
+      },
+      actions: {
+        manualDownload: "📥 Datei manuell herunterladen"
+      },
+      footerSecurity: `
+        <div class="security-box">
+          <h3>🔐 <strong>BEVOR DU BEGINNST:</strong> Sicherheit & Datenschutz</h3>
+          <div class="security-columns">
+            <div class="security-block">
+              <p>✅ Diese Seite speichert <strong>keine Dateien dauerhaft</strong>.</p>
+              <ul>
+                <li>Dateien werden nur im Arbeitsspeicher oder temporär verarbeitet</li>
+                <li>Nach dem Zusammenführen gelöscht</li>
+                <li>Finale Datei wird per HTTPS gesendet</li>
+              </ul>
+            </div>
+            <div class="security-block">
+              <p>⚠️ Der Server ist <strong>zustandslos</strong>:</p>
+              <ul>
+                <li>Sitzungen sind unabhängig</li>
+                <li>Niemand hat Zugriff auf deine Dateien</li>
+                <li>Keine Links werden gespeichert</li>
+              </ul>
+              <p>🌸 Daten werden bei Inaktivität oder Neustart gelöscht</p>
+            </div>
+          </div>
+        </div>
+      `
+    }
+  };
+
+
+
+  function switchLanguage(lang) {
+    const t = translations[lang];
+    if (!t) return;
+
+    document.querySelector("h2").textContent = t.title;
+    document.querySelector('label[for="file1"]').textContent = t.file1;
+    document.querySelector('label[for="file2"]').textContent = t.file2;
+    document.querySelector('label[for="local_datetime"]').textContent = t.datetime;
+
+    const steps = document.querySelectorAll(".step div:last-child");
+    steps.forEach((el, idx) => el.textContent = t.steps[idx]);
+
+    document.getElementById("mergeButton").textContent = t.mergeButton;
+
+    const summaryText = document.getElementById("summary-text");
+    if (summaryText) summaryText.innerHTML = t.summary;
+
+    const details = document.getElementById("progressDetails");
+    if (details) details.textContent = t.progressReady;
+
+    document.getElementById("footer-message").innerHTML = t.footer.message;
+    document.getElementById("footer-copy").textContent = t.footer.copyright;
+
+    // 🔁 Affiche uniquement le bloc de sécurité correspondant à la langue
+    const allLangBlocks = document.querySelectorAll('[id^="footer-security-"]');
+    allLangBlocks.forEach(el => el.style.display = 'none');
+
+    const langBox = document.getElementById(`footer-security-${lang}`);
+    if (langBox) {
+      langBox.innerHTML = t.footerSecurity;
+      langBox.style.display = 'grid';
+    }
+
+    // 📥 Texte du bouton et message de téléchargement manuel
+    const manualMessage = document.getElementById("manualDownloadMessage");
+    if (manualMessage) manualMessage.textContent = t.manualDownload.message;
+
+    const manualBtn = document.getElementById("manualDownloadBtn");
+    if (manualBtn) manualBtn.textContent = t.manualDownload.button;
+
+
+    localStorage.setItem('preferredLang', lang);
+    window.currentLang = lang;
+  }
+
+  window.addEventListener("DOMContentLoaded", () => {
+    const savedLang = localStorage.getItem('preferredLang') || 'fr';
+    switchLanguage(savedLang);
+  });
+
+   window.startMerge = startMerge;  // 👈 expose la fonction pour le HTML
+   window.switchLanguage = switchLanguage;
+   window.copyError = copyError;
+
+
+
+
+
+</script>
+</body>
+</html>

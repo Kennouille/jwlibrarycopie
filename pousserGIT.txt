@@ -1,0 +1,52 @@
+aller dans un terminal
+
+se rendre dans le dossier de jwlibrary
+
+cd Desktop
+cd Jwlibrary
+
+
+Puis
+
+git push
+
+
+
+
+Exemple concret :
+Tu modifies server.py :
+
+@app.route('/hello')
+def hello():
+    return "Salut !"
+
+
+
+Tu dois faire dans ton terminal :
+
+git add .
+git commit -m "fix erreur"
+git push
+
+
+
+✅ Résumé simple :
+Action	            Pousser vers GitHub ?	Déployer sur Netlify ?
+BACKEND
+Modifier server.py	        ✅ Oui	                ❌ Non
+Modifier Dockerfile	        ✅ Oui	                ❌ Non
+Modifier requirements.txt	✅ Oui	                ❌ Non
+
+FRONTEND
+Modifier .html, .js	        ❌ Non	                ✅ Oui
+Modifier CSS	            ❌ Non	                ✅ Oui
+
+
+https://jwlibrary-backend.onrender.com/download/debug
+
+
+POUR LES STATS
+https://web-production-a18d.up.railway.app/get-merge-stats
+
+
+dans la console directement
