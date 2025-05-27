@@ -794,16 +794,12 @@
       console.log("🔍 Aperçu .tags :", previewData.tags);
 
       // Empêche l’erreur si previewData.notes est undefined
-      if (!previewData.notes || !Array.isArray(previewData.notes)) {
-        console.error("❌ 'notes' est manquant ou invalide dans le JSON reçu.");
+      if (!previewData.notes || !Array.isArray(previewData.notes.file1) || !Array.isArray(previewData.notes.file2)) {
+        console.error("❌ 'notes.file1' ou 'notes.file2' manquant ou invalide dans le JSON reçu.");
         throw new Error("Le backend n’a pas renvoyé la structure attendue pour les notes.");
       }
 
-
       loadPreviewData(previewData);  // ← ici tu montres les tabs Notes, Bookmarks, Tags, etc.
-
-      renderNotesPreview(previewData.notes);
-
 
       await updateProgress(100, "Aperçu prêt", 5);
       document.getElementById('merge-summary').classList.remove('hidden');
