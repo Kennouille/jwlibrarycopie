@@ -812,28 +812,15 @@
   function loadPreviewData(previewData) {
     document.getElementById("preview-section").classList.remove("hidden");
 
-    const fieldFilter = {
-      notes: ["title", "content"],
-      bookmarks: ["title"],
-      tags: ["Name"]
-    };
-
     for (const [tableName, contents] of Object.entries(previewData)) {
       const tabEl = document.getElementById(`tab-${tableName.toLowerCase()}`);
       console.log(`🔍 Aperçu .${tableName} :`, contents);
 
+      // Vérification sécurisée
       if (!contents || !Array.isArray(contents.file1) || !Array.isArray(contents.file2)) {
         console.warn(`⛔ Onglet manquant ou données invalides pour ${tableName}`);
         continue;
       }
-
-      const fieldsToKeep = fieldFilter[tableName.toLowerCase()] || [];
-
-      const extractFields = (obj) => {
-        return fieldsToKeep.length > 0
-          ? Object.fromEntries(Object.entries(obj).filter(([k]) => fieldsToKeep.includes(k)))
-          : obj;
-      };
 
       tabEl.innerHTML = `
         <table style="width: 100%; border-collapse: collapse;">
@@ -849,12 +836,8 @@
               const item2 = contents.file2[index] || {};
               return `
                 <tr>
-                  <td style="padding: 6px; border: 1px solid #ccc;">
-                    <pre>${JSON.stringify(extractFields(item1), null, 2)}</pre>
-                  </td>
-                  <td style="padding: 6px; border: 1px solid #ccc;">
-                    <pre>${JSON.stringify(extractFields(item2), null, 2)}</pre>
-                  </td>
+                  <td style="padding: 6px; border: 1px solid #ccc;"><pre>${JSON.stringify(item1, null, 2)}</pre></td>
+                  <td style="padding: 6px; border: 1px solid #ccc;"><pre>${JSON.stringify(item2, null, 2)}</pre></td>
                   <td style="padding: 6px; border: 1px solid #ccc;">
                     <select data-table="${tableName}" data-index="${index}" class="merge-choice">
                       <option value="file1">Garder fichier 1</option>
@@ -869,7 +852,6 @@
       `;
     }
   }
-
 
 
   function showTab(tabName) {
