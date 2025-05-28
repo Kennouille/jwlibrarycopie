@@ -554,13 +554,12 @@ def merge_other_tables(merged_db_path, db1_path, db2_path, exclude_tables=None):
     merged_conn.close()
 
 
-def merge_bookmarks(merged_db_path, file1_db, file2_db, location_id_map):
-    print("\n[FUSION BOOKMARKS - IDÉMPOTENT]")
+def merge_bookmarks(merged_db_path, file1_db, file2_db, location_id_map, bookmark_choices):
+    print("\n[FUSION BOOKMARKS AVEC CHOIX UTILISATEUR]")
     mapping = {}
     conn = sqlite3.connect(merged_db_path)
     cursor = conn.cursor()
 
-    # Table de mapping
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS MergeMapping_Bookmark (
             SourceDb TEXT,
@@ -570,172 +569,191 @@ def merge_bookmarks(merged_db_path, file1_db, file2_db, location_id_map):
         )
     """)
 
-    for db_path in [file1_db, file2_db]:
-        with sqlite3.connect(db_path) as src_conn:
-            src_cursor = src_conn.cursor()
+    def fetch_bookmarks(db_path):
+        with sqlite3.connect(db_path) as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT BookmarkId, LocationId, PublicationLocationId, Slot, Title, Snippet, BlockType, BlockIdentifier FROM Bookmark")
+            return cur.fetchall()
 
-            src_cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='Bookmark'")
-            if not src_cursor.fetchone():
-                print(f"Aucune table Bookmark trouvée dans {db_path}")
+    bookmarks1 = fetch_bookmarks(file1_db)
+    bookmarks2 = fetch_bookmarks(file2_db)
+
+    for index, (row1, row2) in enumerate(zip(bookmarks1, bookmarks2)):
+        choice = bookmark_choices.get(str(index), "file1")
+
+        to_insert = []
+        if choice == "file1":
+            to_insert = [(row1, file1_db)]
+        elif choice == "file2":
+            to_insert = [(row2, file2_db)]
+        elif choice == "both":
+            to_insert = [(row1, file1_db), (row2, file2_db)]
+        elif choice == "ignore":
+            continue
+
+        for row, source_db in to_insert:
+            old_id, loc_id, pub_loc_id, slot, title, snippet, block_type, block_id = row
+
+            # Nouveau LocationId mappé
+            new_loc_id = location_id_map.get((source_db, loc_id), loc_id)
+            new_pub_loc_id = location_id_map.get((source_db, pub_loc_id), pub_loc_id)
+
+            cursor.execute("SELECT 1 FROM Location WHERE LocationId IN (?, ?)", (new_loc_id, new_pub_loc_id))
+            if len(cursor.fetchall()) != 2:
+                print(f"⚠️ LocationId introuvable pour Bookmark OldID {old_id} dans {source_db} (LocationId {new_loc_id} ou PublicationLocationId {new_pub_loc_id}), ignoré.")
                 continue
 
-            src_cursor.execute("""
-                SELECT BookmarkId, LocationId, PublicationLocationId, Slot, Title, 
-                       Snippet, BlockType, BlockIdentifier
-                FROM Bookmark
-            """)
-            for row in src_cursor.fetchall():
-                old_id, loc_id, pub_loc_id, slot, title, snippet, block_type, block_id = row
+            # Déjà fusionné ?
+            cursor.execute("""
+                SELECT NewID FROM MergeMapping_Bookmark
+                WHERE SourceDb = ? AND OldID = ?
+            """, (source_db, old_id))
+            res = cursor.fetchone()
+            if res:
+                mapping[(source_db, old_id)] = res[0]
+                continue
 
-                # Déjà fusionné ?
+            # Vérification de doublon
+            cursor.execute("""
+                SELECT BookmarkId FROM Bookmark
+                WHERE LocationId = ?
+                AND PublicationLocationId = ?
+                AND Slot = ?
+                AND Title = ?
+                AND IFNULL(Snippet, '') = IFNULL(?, '')
+                AND BlockType = ?
+                AND IFNULL(BlockIdentifier, -1) = IFNULL(?, -1)
+            """, (new_loc_id, new_pub_loc_id, slot, title, snippet, block_type, block_id))
+            existing = cursor.fetchone()
+
+            if existing:
+                existing_id = existing[0]
+                print(f"⏩ Bookmark identique trouvé : OldID {old_id} → NewID {existing_id}")
+                mapping[(source_db, old_id)] = existing_id
                 cursor.execute("""
-                    SELECT NewID FROM MergeMapping_Bookmark
-                    WHERE SourceDb = ? AND OldID = ?
-                """, (db_path, old_id))
-                res = cursor.fetchone()
-                if res:
-                    mapping[(db_path, old_id)] = res[0]
-                    continue
-
-                # Nouveau LocationId mappé
-                new_loc_id = location_id_map.get((db_path, loc_id), loc_id)
-                new_pub_loc_id = location_id_map.get((db_path, pub_loc_id), pub_loc_id)
-
-                cursor.execute("SELECT 1 FROM Location WHERE LocationId IN (?, ?)", (new_loc_id, new_pub_loc_id))
-                if len(cursor.fetchall()) != 2:
-                    print(f"⚠️ LocationId introuvable pour Bookmark OldID {old_id} dans {db_path} (LocationId {new_loc_id} ou PublicationLocationId {new_pub_loc_id}), ignoré.")
-                    continue
-
-                # 🔍 Vérification de doublon sur tous les champs SAUF PublicationLocationId et Slot
-                cursor.execute("""
-                    SELECT BookmarkId FROM Bookmark
-                    WHERE LocationId = ?
-                    AND PublicationLocationId = ?
-                    AND Slot = ?
-                    AND Title = ?
-                    AND IFNULL(Snippet, '') = IFNULL(?, '')
-                    AND BlockType = ?
-                    AND IFNULL(BlockIdentifier, -1) = IFNULL(?, -1)
-                """, (new_loc_id, new_pub_loc_id, slot, title, snippet, block_type, block_id))
-
-                existing = cursor.fetchone()
-
-                if existing:
-                    existing_id = existing[0]
-                    print(f"⏩ Bookmark identique trouvé (même contenu mais différent emplacement) : OldID {old_id} → NewID {existing_id}")
-                    mapping[(db_path, old_id)] = existing_id
-                    cursor.execute("""
-                        INSERT OR IGNORE INTO MergeMapping_Bookmark (SourceDb, OldID, NewID)
-                        VALUES (?, ?, ?)
-                    """, (db_path, old_id, existing_id))
-                    continue
-
-                # ⚠️ Sinon, vérifier et ajuster le slot
-                original_slot = slot
-                while True:
-                    cursor.execute("""
-                        SELECT 1 FROM Bookmark
-                        WHERE PublicationLocationId = ? AND Slot = ?
-                    """, (new_pub_loc_id, slot))
-                    if not cursor.fetchone():
-                        break
-                    slot += 1
-
-                print(f"Insertion Bookmark: OldID {old_id} (slot initial {original_slot} -> {slot}), PubLocId {new_pub_loc_id}, Title='{title}'")
-                cursor.execute("""
-                    INSERT INTO Bookmark
-                    (LocationId, PublicationLocationId, Slot, Title,
-                     Snippet, BlockType, BlockIdentifier)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (new_loc_id, new_pub_loc_id, slot, title, snippet, block_type, block_id))
-                new_id = cursor.lastrowid
-                mapping[(db_path, old_id)] = new_id
-
-                cursor.execute("""
-                    INSERT INTO MergeMapping_Bookmark (SourceDb, OldID, NewID)
+                    INSERT OR IGNORE INTO MergeMapping_Bookmark (SourceDb, OldID, NewID)
                     VALUES (?, ?, ?)
-                """, (db_path, old_id, new_id))
+                """, (source_db, old_id, existing_id))
+                continue
 
-    # 👉 Un seul commit après TOUT
+            # Ajustement de slot
+            original_slot = slot
+            while True:
+                cursor.execute("""
+                    SELECT 1 FROM Bookmark
+                    WHERE PublicationLocationId = ? AND Slot = ?
+                """, (new_pub_loc_id, slot))
+                if not cursor.fetchone():
+                    break
+                slot += 1
+
+            print(f"Insertion Bookmark: OldID {old_id} (slot {original_slot} -> {slot}), PubLocId {new_pub_loc_id}, Title='{title}'")
+            cursor.execute("""
+                INSERT INTO Bookmark
+                (LocationId, PublicationLocationId, Slot, Title,
+                 Snippet, BlockType, BlockIdentifier)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (new_loc_id, new_pub_loc_id, slot, title, snippet, block_type, block_id))
+            new_id = cursor.lastrowid
+            mapping[(source_db, old_id)] = new_id
+
+            cursor.execute("""
+                INSERT INTO MergeMapping_Bookmark (SourceDb, OldID, NewID)
+                VALUES (?, ?, ?)
+            """, (source_db, old_id, new_id))
+
     conn.commit()
     conn.close()
 
-    print("✔ Fusion Bookmarks terminée (avec détection de doublons par contenu).")
+    print("✔ Fusion Bookmarks terminée (avec choix utilisateur).")
     return mapping
 
 
-def merge_notes(merged_db_path, file1_db, file2_db, location_id_map, usermark_guid_map):
-    """
-    Fusionne la table Note de façon à ne pas écraser les données existantes.
-    Si une note avec le même GUID existe déjà mais que le contenu diffère,
-    on insère une nouvelle note avec un nouveau GUID et on laisse en place la note existante.
-    Renvoie un mapping (SourceDb, OldNoteId) -> NewNoteId
-    """
-    print("\n=== FUSION DES NOTES (résolution de conflit par insertion) ===")
+def merge_notes(merged_db_path, db1_path, db2_path, location_id_map, usermark_guid_map, note_choices):
+    print("\n=== FUSION DES NOTES AVEC CHOIX UTILISATEUR ===")
     inserted = 0
     note_mapping = {}
 
-    conn = sqlite3.connect(merged_db_path)
-    cursor = conn.cursor()
-
-    for db_path in [file1_db, file2_db]:
-        with sqlite3.connect(db_path) as src_conn:
-            src_cursor = src_conn.cursor()
-            src_cursor.execute("""
+    def fetch_notes(db_path):
+        with sqlite3.connect(db_path) as conn:
+            cur = conn.cursor()
+            cur.execute("""
                 SELECT n.NoteId, n.Guid, um.UserMarkGuid, n.LocationId, n.Title, n.Content,
                        n.LastModified, n.Created, n.BlockType, n.BlockIdentifier
                 FROM Note n
                 LEFT JOIN UserMark um ON n.UserMarkId = um.UserMarkId
             """)
-            for (old_note_id, guid, usermark_guid, location_id, title, content,
-                 last_modified, created, block_type, block_identifier) in src_cursor.fetchall():
+            return cur.fetchall()
 
-                normalized_key = (os.path.normpath(db_path), location_id)
-                normalized_map = {(os.path.normpath(k[0]), k[1]): v for k, v in location_id_map.items()}
-                new_location_id = normalized_map.get(normalized_key) if location_id else None
-                new_usermark_id = usermark_guid_map.get(usermark_guid) if usermark_guid else None
+    notes1 = fetch_notes(db1_path)
+    notes2 = fetch_notes(db2_path)
 
-                if new_location_id is None:
-                    print(f"⚠️ LocationId introuvable pour Note guid={guid} (source: {db_path}), ignorée.")
+    conn = sqlite3.connect(merged_db_path)
+    cursor = conn.cursor()
+
+    for index, (row1, row2) in enumerate(zip(notes1, notes2)):
+        choice = note_choices.get(str(index), "file1")
+
+        to_insert = []
+        if choice == "file1":
+            to_insert = [(row1, db1_path)]
+        elif choice == "file2":
+            to_insert = [(row2, db2_path)]
+        elif choice == "both":
+            to_insert = [(row1, db1_path), (row2, db2_path)]
+        elif choice == "ignore":
+            continue
+
+        for row, source_db in to_insert:
+            (old_note_id, guid, usermark_guid, location_id, title, content,
+             last_modified, created, block_type, block_identifier) = row
+
+            normalized_key = (os.path.normpath(source_db), location_id)
+            normalized_map = {(os.path.normpath(k[0]), k[1]): v for k, v in location_id_map.items()}
+            new_location_id = normalized_map.get(normalized_key) if location_id else None
+            new_usermark_id = usermark_guid_map.get(usermark_guid) if usermark_guid else None
+
+            if new_location_id is None:
+                print(f"⚠️ LocationId introuvable pour Note guid={guid} (source: {source_db}), ignorée.")
+                continue
+
+            # Vérifier si le GUID existe déjà
+            cursor.execute("SELECT NoteId, Title, Content FROM Note WHERE Guid = ?", (guid,))
+            existing = cursor.fetchone()
+
+            if existing:
+                existing_note_id, existing_title, existing_content = existing
+                if existing_title == title and existing_content == content:
+                    print(f"Note guid={guid} déjà présente et identique (source: {source_db}), aucune action.")
+                    note_mapping[(source_db, old_note_id)] = existing_note_id
                     continue
-
-                # Vérifier si le GUID existe déjà
-                cursor.execute("SELECT NoteId, Title, Content FROM Note WHERE Guid = ?", (guid,))
-                existing = cursor.fetchone()
-
-                if existing:
-                    existing_note_id, existing_title, existing_content = existing
-                    if existing_title == title and existing_content == content:
-                        print(f"Note guid={guid} déjà présente et identique (source: {db_path}), aucune action.")
-                        note_mapping[(db_path, old_note_id)] = existing_note_id
-                        continue
-                    else:
-                        new_guid = str(uuid.uuid4())
-                        print(f"Conflit pour Note guid={guid} (source: {db_path}). "
-                              f"Insertion d'une nouvelle note avec nouveau GUID {new_guid}.")
-                        guid_to_insert = new_guid
                 else:
-                    guid_to_insert = guid
+                    new_guid = str(uuid.uuid4())
+                    print(f"Conflit pour Note guid={guid} (source: {source_db}). "
+                          f"Insertion d'une nouvelle note avec nouveau GUID {new_guid}.")
+                    guid_to_insert = new_guid
+            else:
+                guid_to_insert = guid
 
-                cursor.execute("""
-                    INSERT INTO Note
-                    (Guid, UserMarkId, LocationId, Title, Content,
-                     LastModified, Created, BlockType, BlockIdentifier)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    guid_to_insert,
-                    new_usermark_id,
-                    new_location_id,
-                    title,
-                    content,
-                    last_modified,
-                    created,
-                    block_type,
-                    block_identifier
-                ))
-                new_note_id = cursor.lastrowid
-                note_mapping[(db_path, old_note_id)] = new_note_id
-                inserted += 1
+            cursor.execute("""
+                INSERT INTO Note
+                (Guid, UserMarkId, LocationId, Title, Content,
+                 LastModified, Created, BlockType, BlockIdentifier)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                guid_to_insert,
+                new_usermark_id,
+                new_location_id,
+                title,
+                content,
+                last_modified,
+                created,
+                block_type,
+                block_identifier
+            ))
+            new_note_id = cursor.lastrowid
+            note_mapping[(source_db, old_note_id)] = new_note_id
+            inserted += 1
 
     conn.commit()
     conn.close()
@@ -1406,11 +1424,11 @@ def compare_data():
     return response, 200
 
 
-def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, location_id_map, item_id_map):
+def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, location_id_map, item_id_map, tag_choices):
     """
-    Fusionne Tags et TagMap de façon idempotente et rapide.
+    Fusionne Tags et TagMap avec prise en compte des choix utilisateur.
     """
-    print("\n[FUSION TAGS ET TAGMAP - IDÉMPOTENTE]")
+    print("\n[FUSION TAGS ET TAGMAP - AVEC CHOIX UTILISATEUR]")
 
     conn = sqlite3.connect(merged_db_path)
     cursor = conn.cursor()
@@ -1433,35 +1451,53 @@ def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, loca
     """)
     conn.commit()
 
-    # Fusion des Tags
+    # Fusion des Tags (avec choix)
     cursor.execute("SELECT COALESCE(MAX(TagId), 0) FROM Tag")
     max_tag_id = cursor.fetchone()[0]
     tag_id_map = {}
 
-    for db_path in [file1_db, file2_db]:
-        with sqlite3.connect(db_path) as src_conn:
-            src_cursor = src_conn.cursor()
-            src_cursor.execute("SELECT TagId, Type, Name FROM Tag")
-            for tag_id, tag_type, tag_name in src_cursor.fetchall():
-                cursor.execute("SELECT NewTagId FROM MergeMapping_Tag WHERE SourceDb = ? AND OldTagId = ?", (db_path, tag_id))
-                res = cursor.fetchone()
-                if res:
-                    tag_id_map[(db_path, tag_id)] = res[0]
-                    continue
+    def fetch_tags(db_path):
+        with sqlite3.connect(db_path) as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT TagId, Type, Name FROM Tag")
+            return cur.fetchall()
 
-                cursor.execute("SELECT TagId FROM Tag WHERE Type = ? AND Name = ?", (tag_type, tag_name))
-                existing = cursor.fetchone()
-                if existing:
-                    new_tag_id = existing[0]
-                else:
-                    max_tag_id += 1
-                    new_tag_id = max_tag_id
-                    cursor.execute("INSERT INTO Tag (TagId, Type, Name) VALUES (?, ?, ?)", (new_tag_id, tag_type, tag_name))
+    tags1 = fetch_tags(file1_db)
+    tags2 = fetch_tags(file2_db)
 
-                tag_id_map[(db_path, tag_id)] = new_tag_id
-                cursor.execute("INSERT INTO MergeMapping_Tag (SourceDb, OldTagId, NewTagId) VALUES (?, ?, ?)", (db_path, tag_id, new_tag_id))
+    for index, (tag1, tag2) in enumerate(zip(tags1, tags2)):
+        choice = tag_choices.get(str(index), "file1")
 
-    # Fusion des TagMap
+        to_insert = []
+        if choice == "file1":
+            to_insert = [(tag1, file1_db)]
+        elif choice == "file2":
+            to_insert = [(tag2, file2_db)]
+        elif choice == "both":
+            to_insert = [(tag1, file1_db), (tag2, file2_db)]
+        elif choice == "ignore":
+            continue
+
+        for (tag_id, tag_type, tag_name), db_path in to_insert:
+            cursor.execute("SELECT NewTagId FROM MergeMapping_Tag WHERE SourceDb = ? AND OldTagId = ?", (db_path, tag_id))
+            res = cursor.fetchone()
+            if res:
+                tag_id_map[(db_path, tag_id)] = res[0]
+                continue
+
+            cursor.execute("SELECT TagId FROM Tag WHERE Type = ? AND Name = ?", (tag_type, tag_name))
+            existing = cursor.fetchone()
+            if existing:
+                new_tag_id = existing[0]
+            else:
+                max_tag_id += 1
+                new_tag_id = max_tag_id
+                cursor.execute("INSERT INTO Tag (TagId, Type, Name) VALUES (?, ?, ?)", (new_tag_id, tag_type, tag_name))
+
+            tag_id_map[(db_path, tag_id)] = new_tag_id
+            cursor.execute("INSERT INTO MergeMapping_Tag (SourceDb, OldTagId, NewTagId) VALUES (?, ?, ?)", (db_path, tag_id, new_tag_id))
+
+    # Fusion des TagMap (inchangée)
     cursor.execute("SELECT COALESCE(MAX(TagMapId), 0) FROM TagMap")
     max_tagmap_id = cursor.fetchone()[0]
     tagmap_id_map = {}
@@ -1485,7 +1521,6 @@ def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, loca
                 if non_null_refs != 1:
                     continue
 
-                # Vérification de doublon exact
                 cursor.execute("""
                     SELECT TagMapId FROM TagMap
                     WHERE TagId = ?
@@ -1497,7 +1532,6 @@ def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, loca
                 if cursor.fetchone():
                     continue
 
-                # Vérification spéciale sur (TagId, LocationId)
                 if new_location_id is not None:
                     cursor.execute("""
                         SELECT TagMapId FROM TagMap
@@ -1508,7 +1542,6 @@ def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, loca
                         tagmap_id_map[(db_path, old_tagmap_id)] = existing[0]
                         continue
 
-                # Gestion de conflit sur (TagId, Position)
                 tentative = position
                 while True:
                     cursor.execute("SELECT 1 FROM TagMap WHERE TagId = ? AND Position = ?", (new_tag_id, tentative))
@@ -1533,7 +1566,7 @@ def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, loca
 
     conn.commit()
     conn.close()
-    print("Fusion des Tags et TagMap terminée (idempotente).")
+    print("Fusion des Tags et TagMap terminée (avec choix utilisateur).")
     return tag_id_map, tagmap_id_map
 
 
@@ -2388,7 +2421,14 @@ def merge_data():
         print("\n=== PRÊT POUR FUSION ===\n")
 
         try:
-            merge_bookmarks(merged_db_path, file1_db, file2_db, location_id_map)
+            merge_bookmarks(
+                merged_db_path,
+                file1_db,
+                file2_db,
+                location_id_map,
+                payload.get("choices", {}).get("bookmarks", {})
+            )
+
         except Exception as e:
             import traceback
             print(f"❌ Erreur dans merge_bookmarks : {e}")
@@ -2422,7 +2462,8 @@ def merge_data():
                 file1_db,
                 file2_db,
                 location_id_map,
-                usermark_guid_map
+                usermark_guid_map,
+                payload.get("choices", {}).get("notes", {})  # <-- nouveau paramètre
             )
         except Exception as e:
             import traceback
@@ -2438,8 +2479,10 @@ def merge_data():
                 file2_db,
                 note_mapping,
                 location_id_map,
-                item_id_map
+                item_id_map,
+                payload.get("choices", {}).get("tags", {})  # <-- choix utilisateur tags
             )
+
             print(f"Tag ID Map: {tag_id_map}")
             print(f"TagMap ID Map: {tagmap_id_map}")
 
@@ -2736,7 +2779,8 @@ def merge_data():
                     file2_db,
                     note_mapping,
                     location_id_map,
-                    item_id_map
+                    item_id_map,
+                    payload.get("choices", {}).get("tags", {})  # <-- choix utilisateur tags
                 )
                 print(f"Tag ID Map: {tag_id_map}")
                 print(f"TagMap ID Map: {tagmap_id_map}")

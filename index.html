@@ -389,6 +389,16 @@
       font-weight: bold;
     }
 
+    td pre {
+      white-space: pre-wrap;       /* Forcer retour à la ligne */
+      word-wrap: break-word;       /* Casser les longs mots */
+      overflow-wrap: break-word;   /* Compatibilité */
+      max-width: 100%;             /* Ne jamais dépasser la cellule */
+      font-size: 14px;             /* Réduire un peu si nécessaire */
+      margin: 0;                   /* Enlever marges inutiles */
+    }
+
+
 
 
   </style>
@@ -866,6 +876,7 @@
                     <select data-table="${tableName}" data-index="${index}" class="merge-choice">
                       <option value="file1">Garder fichier 1</option>
                       <option value="file2">Garder fichier 2</option>
+                      <option value="both">Garder les deux</option>
                       <option value="ignore">Ignorer</option>
                     </select>
                   </td>
@@ -1027,13 +1038,27 @@
       progressBar.classList.add('progress-bar-animated');
       document.getElementById('construction-container').classList.remove('hidden');
 
+      const choices = { notes: {}, bookmarks: {}, tags: {} };
+
+      document.querySelectorAll(".merge-choice").forEach(select => {
+        const table = select.dataset.table;
+        const index = select.dataset.index;
+        const value = select.value;
+
+        if (!choices[table]) choices[table] = {};
+        choices[table][index] = value;
+      });
+
       const response = await fetch(`${BASE_URL}/merge`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "ngrok-skip-browser-warning": "true"
         },
-        body: JSON.stringify({ local_datetime: localDatetime })
+        body: JSON.stringify({
+          local_datetime: localDatetime,
+          choices: choices
+        })
       });
 
       if (!response.ok) {
