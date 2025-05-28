@@ -1078,6 +1078,21 @@
     });
   }
 
+  function updateMergeSteps(activeIndex) {
+    for (let i = 1; i <= 5; i++) {
+      const step = document.getElementById(`mergeStep${i}`);
+      if (i < activeIndex) {
+        step.classList.add('completed');
+        step.classList.remove('active');
+      } else if (i === activeIndex) {
+        step.classList.add('active');
+        step.classList.remove('completed');
+      } else {
+        step.classList.remove('active', 'completed');
+      }
+    }
+  }
+
 
   async function startMerge() {
     try {
