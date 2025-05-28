@@ -450,6 +450,53 @@
       animation: pulse 1.5s infinite;
     }
 
+    .merge-indicator {
+      display: flex;
+      justify-content: space-between;
+      margin: 30px 0 15px;
+      position: relative;
+    }
+
+    .merge-indicator::before {
+      content: "";
+      position: absolute;
+      top: 15px;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background-color: #ecf0f1;
+      z-index: 0;
+    }
+
+    .merge-step {
+      text-align: center;
+      z-index: 1;
+      background-color: #f9f9f9;
+      padding: 0 10px;
+    }
+
+    .merge-step .merge-step-circle {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background-color: #bdc3c7;
+      color: white;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+
+    .merge-step.completed .merge-step-circle {
+      background-color: #2ecc71;
+    }
+
+    .merge-step.active .merge-step-circle {
+      background-color: #3498db;
+      animation: pulse 1.5s infinite;
+    }
+
 
 
 
@@ -558,13 +605,27 @@
     <div id="tab-tags" class="tab-content hidden"></div>
   </div>
 
-  <div id="merge-step-indicator" class="step-indicator hidden">
-    <div class="step"><div class="step-circle">1</div><div>Préparation</div></div>
-    <div class="step"><div class="step-circle">2</div><div>Médias</div></div>
-    <div class="step"><div class="step-circle">3</div><div>Upload</div></div>
-    <div class="step"><div class="step-circle">4</div><div>Fusion</div></div>
-    <div class="step"><div class="step-circle">5</div><div>ZIP</div></div>
-    <div class="step"><div class="step-circle">6</div><div>Terminé</div></div>
+  <div class="merge-indicator">
+    <div class="merge-step" id="mergeStep1">
+      <div class="merge-step-circle">1</div>
+      <div>Upload</div>
+    </div>
+    <div class="merge-step" id="mergeStep2">
+      <div class="merge-step-circle">2</div>
+      <div>Fusion</div>
+    </div>
+    <div class="merge-step" id="mergeStep3">
+      <div class="merge-step-circle">3</div>
+      <div>ZIP</div>
+    </div>
+    <div class="merge-step" id="mergeStep4">
+      <div class="merge-step-circle">4</div>
+      <div>Finalisation</div>
+    </div>
+    <div class="merge-step" id="mergeStep5">
+      <div class="merge-step-circle">5</div>
+      <div>Terminé</div>
+    </div>
   </div>
 
   <div style="margin-top: 30px; text-align: center;">
@@ -1034,20 +1095,8 @@
       const mergeButton = document.getElementById('mergeButton');
       mergeButton.disabled = true;
 
-      // 🟡 Initialisation des étapes visuelles
-      const steps = Array.from(document.querySelectorAll('#merge-step-indicator .step'));
-      steps.forEach(step => step.classList.remove("completed", "active"));
-      document.getElementById("merge-step-indicator").classList.remove("hidden");
-      const activateStep = (index) => {
-        steps.forEach(s => s.classList.remove("active"));
-        if (index > 0) steps[index - 1].classList.add("completed");
-        steps[index]?.classList.add("active");
-      };
-
-      activateStep(0); // Start
-
-      // Étape 1 : Préparation
-      activateStep(1);
+      updateMergeSteps(1);
+      await updateProgress(5, "Préparation des fichiers...", 1);
       await simulateProcessing(800, 20, "Chargement des fichiers...", 1);
 
       const zip1 = await JSZip.loadAsync(file1);
@@ -1061,9 +1110,6 @@
         throw new Error("Les fichiers userData.db sont trop volumineux (plus de 95MB combinés).");
       }
 
-      // Étape 2 : Médias
-      activateStep(2);
-
       const media1 = [], media2 = [];
       const hashFile = async (file) => {
         const buffer = await file.async("arraybuffer");
@@ -1071,8 +1117,8 @@
         return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
       };
 
-      const collectMedia = async (zip, targetList, skipNames = ["userData.db", "userData.db-shm", "userData.db-wal"]) => {
-        const skipSet = new Set(skipNames.map(n => n.toLowerCase()));
+      const collectMedia = async (zip, targetList, skip = ["userData.db", "userData.db-shm", "userData.db-wal"]) => {
+        const skipSet = new Set(skip.map(n => n.toLowerCase()));
         for (const file of Object.values(zip.files)) {
           const name = file.name.toLowerCase();
           if ([...skipSet].some(skip => name.endsWith(skip))) continue;
@@ -1103,13 +1149,19 @@
       formData.append("file1", new File([userData1], "userData1.db"));
       formData.append("file2", new File([userData2], "userData2.db"));
 
-      // Étape 3 : Upload
-      activateStep(3);
+      updateMergeSteps(2);
+      await updateProgress(20, "Début de l'upload...", 2);
       await uploadWithProgress(`${BASE_URL}/upload`, formData);
 
-      // Étape 4 : Fusion backend
-      activateStep(4);
+      await updateProgress(50, "Extraction des données...", 3);
+      await simulateProcessing(3000, 80, "Analyse des contenus...", 3);
+
+      updateMergeSteps(3);
+      await updateProgress(90, "Fusion en cours...", 4);
       appendToMergeLog("Fusion en cours, veuillez patienter...");
+
+      const progressBar = document.getElementById('progressBar');
+      progressBar.classList.add('progress-bar-animated');
       document.getElementById('construction-container').classList.remove('hidden');
 
       const choices = { notes: {}, bookmarks: {}, tags: {} };
@@ -1146,46 +1198,43 @@
         throw new Error("La fusion n’a pas été finalisée correctement.");
       }
 
+      progressBar.classList.remove('progress-bar-animated');
       document.getElementById('construction-container').classList.add('hidden');
 
-      // Étape 5 : ZIP
-      activateStep(5);
+      updateMergeSteps(4);
       await updateProgress(92, "Création du fichier ZIP final...", 5);
+
       await updateProgress(95, "Reconstruction du fichier .jwlibrary...", 5);
+      console.log("🚀 rebuildFinalZip() va être appelé");
 
       await rebuildFinalZip();
       trackMerge("success");
       await logMergeToSupabase("success");
 
-      // Étape 6 : Terminé
-      activateStep(6);
+      updateMergeSteps(5);
       await updateProgress(100, "Fichier prêt", 5);
+      document.getElementById("progressDetails").textContent = "✅ Téléchargement terminé ou en cours.";
 
       const step5 = document.getElementById("step5");
       step5.classList.remove("active");
       step5.classList.add("completed");
 
-      document.getElementById("progressDetails").textContent = "✅ Téléchargement terminé ou en cours.";
-
+      document.getElementById('merge-summary').classList.remove('hidden');
       const summaryText = document.getElementById('summary-text');
       summaryText.innerHTML =
         `La fusion est terminée. Les données identiques (notes, surlignages, marques-pages, playlists, etc.) ont été conservées.
         Les éléments uniques de chaque fichier ont été ajoutés.<br><br>
         <strong>💡 Une fois le téléchargement automatique effectué, tous les fichiers sont immédiatement effacés. Si le téléchargement ne s'est pas bien passé, actualise la page et renouvelle l'opération en entier.</strong>`;
 
-      document.getElementById('merge-summary').classList.remove('hidden');
-
     } catch (error) {
       console.error("Erreur:", error);
       showError(error.message);
       trackMerge("error", error.message);
       await logMergeToSupabase("error", error.message);
-
       await updateProgress(currentProgress, `Erreur: ${error.message}`);
       document.getElementById('mergeButton').disabled = false;
     }
   }
-
 
 
   function renderPreviewTabs(data) {
