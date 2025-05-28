@@ -578,16 +578,23 @@ def merge_bookmarks(merged_db_path, file1_db, file2_db, location_id_map, bookmar
     bookmarks1 = fetch_bookmarks(file1_db)
     bookmarks2 = fetch_bookmarks(file2_db)
 
-    for index, (row1, row2) in enumerate(zip(bookmarks1, bookmarks2)):
+    max_len = max(len(bookmarks1), len(bookmarks2))
+    for index in range(max_len):
+        row1 = bookmarks1[index] if index < len(bookmarks1) else None
+        row2 = bookmarks2[index] if index < len(bookmarks2) else None
+
         choice = bookmark_choices.get(str(index), "file1")
 
         to_insert = []
-        if choice == "file1":
+        if choice == "file1" and row1:
             to_insert = [(row1, file1_db)]
-        elif choice == "file2":
+        elif choice == "file2" and row2:
             to_insert = [(row2, file2_db)]
         elif choice == "both":
-            to_insert = [(row1, file1_db), (row2, file2_db)]
+            if row1:
+                to_insert.append((row1, file1_db))
+            if row2:
+                to_insert.append((row2, file2_db))
         elif choice == "ignore":
             continue
 
@@ -691,16 +698,23 @@ def merge_notes(merged_db_path, db1_path, db2_path, location_id_map, usermark_gu
     conn = sqlite3.connect(merged_db_path)
     cursor = conn.cursor()
 
-    for index, (row1, row2) in enumerate(zip(notes1, notes2)):
+    max_len = max(len(notes1), len(notes2))
+    for index in range(max_len):
+        row1 = notes1[index] if index < len(notes1) else None
+        row2 = notes2[index] if index < len(notes2) else None
+
         choice = note_choices.get(str(index), "file1")
 
         to_insert = []
-        if choice == "file1":
+        if choice == "file1" and row1:
             to_insert = [(row1, db1_path)]
-        elif choice == "file2":
+        elif choice == "file2" and row2:
             to_insert = [(row2, db2_path)]
         elif choice == "both":
-            to_insert = [(row1, db1_path), (row2, db2_path)]
+            if row1:
+                to_insert.append((row1, db1_path))
+            if row2:
+                to_insert.append((row2, db2_path))
         elif choice == "ignore":
             continue
 
@@ -1465,16 +1479,23 @@ def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, loca
     tags1 = fetch_tags(file1_db)
     tags2 = fetch_tags(file2_db)
 
-    for index, (tag1, tag2) in enumerate(zip(tags1, tags2)):
+    max_len = max(len(tags1), len(tags2))
+    for index in range(max_len):
+        tag1 = tags1[index] if index < len(tags1) else None
+        tag2 = tags2[index] if index < len(tags2) else None
+
         choice = tag_choices.get(str(index), "file1")
 
         to_insert = []
-        if choice == "file1":
+        if choice == "file1" and tag1:
             to_insert = [(tag1, file1_db)]
-        elif choice == "file2":
+        elif choice == "file2" and tag2:
             to_insert = [(tag2, file2_db)]
         elif choice == "both":
-            to_insert = [(tag1, file1_db), (tag2, file2_db)]
+            if tag1:
+                to_insert.append((tag1, file1_db))
+            if tag2:
+                to_insert.append((tag2, file2_db))
         elif choice == "ignore":
             continue
 
