@@ -354,13 +354,14 @@
     .tabs { margin-top: 20px; }
     .tab-btn {
       background-color: white;
-      color: #007bff; /* bleu */
-      border: 1px solid #007bff;
-      padding: 10px 20px;
-      border-radius: 8px;
+      color: #007bff;
+      border: 2px solid #007bff;
+      border-radius: 12px;
       font-weight: bold;
-      cursor: pointer;
-      transition: all 0.2s ease;
+      padding: 12px 24px;
+      font-size: 16px;
+      width: 100%;
+      transition: 0.3s;
       margin-bottom: 10px;
     }
 
@@ -840,6 +841,12 @@
       tags: ["Name"]
     };
 
+    const labels = {
+      Title: "Titre",
+      Content: "Note",
+      Name: "Catégorie"
+    };
+
     for (const [tableName, contents] of Object.entries(previewData)) {
       const tabEl = document.getElementById(`tab-${tableName.toLowerCase()}`);
       console.log(`🔍 Aperçu .${tableName} :`, contents);
@@ -869,14 +876,15 @@
           <tbody>
             ${contents.file1.map((item1, index) => {
               const item2 = contents.file2[index] || {};
+              const html1 = Object.entries(extractFields(item1)).map(([k, v]) =>
+                `<div><strong>${labels[k] || k}</strong>: ${v}</div>`).join("");
+              const html2 = Object.entries(extractFields(item2)).map(([k, v]) =>
+                `<div><strong>${labels[k] || k}</strong>: ${v}</div>`).join("");
+
               return `
                 <tr>
-                  <td style="padding: 6px; border: 1px solid #ccc;">
-                    <pre>${JSON.stringify(extractFields(item1), null, 2)}</pre>
-                  </td>
-                  <td style="padding: 6px; border: 1px solid #ccc;">
-                    <pre>${JSON.stringify(extractFields(item2), null, 2)}</pre>
-                  </td>
+                  <td style="padding: 6px; border: 1px solid #ccc;">${html1}</td>
+                  <td style="padding: 6px; border: 1px solid #ccc;">${html2}</td>
                   <td style="padding: 6px; border: 1px solid #ccc;">
                     <select data-table="${tableName}" data-index="${index}" class="merge-choice">
                       <option value="file1">Garder fichier 1</option>
@@ -892,7 +900,6 @@
       `;
     }
   }
-
 
 
   function showTab(tabName) {
