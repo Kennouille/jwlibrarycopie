@@ -1022,11 +1022,29 @@
       Name: "Catégorie"
     };
 
-    const truncate = (text, maxLength = 300) => {
+    const truncate = (text, label, maxLength = 300) => {
       if (!text) return "";
-      return text.length > maxLength
-        ? `${text.substring(0, maxLength)}... <a href="#" onclick="showFullNote('${text.replace(/'/g, "\\'").replace(/"/g, '&quot;')}'); return false;">(voir tout)</a>`
-        : text;
+      const escaped = escapeHTML(text);
+      if (escaped.length > maxLength) {
+        const short = escaped.slice(0, maxLength) + "…";
+        return `
+          <div>
+            <span>${short}</span>
+            <a href="#" class="show-full-note" data-content="${escaped}" data-label="${label}">[…]</a>
+          </div>`;
+      }
+      return `<div>${escaped}</div>`;
+    };
+
+    const escapeHTML = (str) => {
+      if (typeof str !== 'string') return '';
+      return str.replace(/[&<>'"]/g, tag => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        "'": '&#39;',
+        '"': '&quot;'
+      }[tag]));
     };
 
     for (const [tableName, contents] of Object.entries(previewData)) {
@@ -1061,9 +1079,9 @@
               const item1 = contents.file1[index] || {};
               const item2 = contents.file2[index] || {};
               const html1 = Object.entries(extractFields(item1)).map(([k, v]) =>
-                `<div><strong>${labels[k] || k}</strong>: ${truncate(v)}</div>`).join("");
+                `<div><strong>${labels[k] || k}</strong>: ${truncate(v, labels[k] || k)}</div>`).join("");
               const html2 = Object.entries(extractFields(item2)).map(([k, v]) =>
-                `<div><strong>${labels[k] || k}</strong>: ${truncate(v)}</div>`).join("");
+                `<div><strong>${labels[k] || k}</strong>: ${truncate(v, labels[k] || k)}</div>`).join("");
 
               return `
                 <tr>
@@ -1084,6 +1102,7 @@
       `;
     }
   }
+
 
   function showFullNote(content) {
     document.getElementById("noteModalText").textContent = content;
@@ -1121,6 +1140,16 @@
     );
     if (clickedBtn) clickedBtn.classList.add('active');
   }
+
+  document.addEventListener("click", function (e) {
+    if (e.target.classList.contains("show-full-note")) {
+      e.preventDefault();
+      const content = e.target.getAttribute("data-content");
+      const label = e.target.getAttribute("data-label");
+      showFullNote(content, label);
+    }
+  });
+
 
 
 
