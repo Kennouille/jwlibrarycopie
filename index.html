@@ -950,72 +950,85 @@
 
 
   function loadPreviewData(previewData) {
-    document.getElementById("preview-section").classList.remove("hidden");
+    const tables = ["notes", "bookmarks", "tags"];
 
-    const fieldFilter = {
-      notes: ["Title", "Content"],
-      bookmarks: ["Title"],
-      tags: ["Name"]
-    };
+    tables.forEach(tableName => {
+      const file1Data = previewData[tableName].file1 || [];
+      const file2Data = previewData[tableName].file2 || [];
+      const mergedData = previewData[tableName].merged || [];
 
-    const labels = {
-      Title: "Titre",
-      Content: "Note",
-      Name: "Catégorie"
-    };
+      const maxLength = Math.max(file1Data.length, file2Data.length);
+      const tabContent = document.getElementById(`tab-${tableName}`);
+      tabContent.innerHTML = ""; // Clear previous content
 
-    for (const [tableName, contents] of Object.entries(previewData)) {
-      const tabEl = document.getElementById(`tab-${tableName.toLowerCase()}`);
-      console.log(`🔍 Aperçu .${tableName} :`, contents);
+      const table = document.createElement("table");
+      table.style.width = "100%";
+      table.style.borderCollapse = "collapse";
 
-      if (!contents || !Array.isArray(contents.file1) || !Array.isArray(contents.file2)) {
-        console.warn(`⛔ Onglet manquant ou données invalides pour ${tableName}`);
-        continue;
+      // En-têtes
+      const header = document.createElement("tr");
+      ["Fichier 1", "Fichier 2", "Choix"].forEach(label => {
+        const th = document.createElement("th");
+        th.textContent = label;
+        th.style.border = "1px solid #ccc";
+        th.style.padding = "8px";
+        th.style.backgroundColor = "#f0f0f0";
+        header.appendChild(th);
+      });
+      table.appendChild(header);
+
+      for (let i = 0; i < maxLength; i++) {
+        const row = document.createElement("tr");
+
+        const row1 = file1Data[i] || null;
+        const row2 = file2Data[i] || null;
+
+        const html1 = row1 ? Object.values(row1).join("\n") : "";
+        const html2 = row2 ? Object.values(row2).join("\n") : "";
+
+        const td1 = document.createElement("td");
+        td1.style.padding = "6px";
+        td1.style.border = "1px solid #ccc";
+        td1.innerHTML = `<pre>${html1}</pre>`;
+
+        const td2 = document.createElement("td");
+        td2.style.padding = "6px";
+        td2.style.border = "1px solid #ccc";
+        td2.innerHTML = `<pre>${html2}</pre>`;
+
+        const tdChoice = document.createElement("td");
+        tdChoice.style.padding = "6px";
+        tdChoice.style.border = "1px solid #ccc";
+        const select = document.createElement("select");
+        select.dataset.table = tableName;
+        select.dataset.index = i;
+        select.classList.add("merge-choice");
+
+        ["both", "file1", "file2", "ignore"].forEach(opt => {
+          const option = document.createElement("option");
+          option.value = opt;
+          option.textContent = {
+            both: "Garder les deux",
+            file1: "Garder fichier 1",
+            file2: "Garder fichier 2",
+            ignore: "Ignorer"
+          }[opt];
+          select.appendChild(option);
+        });
+
+        tdChoice.appendChild(select);
+        row.appendChild(td1);
+        row.appendChild(td2);
+        row.appendChild(tdChoice);
+        table.appendChild(row);
       }
 
-      const fieldsToKeep = fieldFilter[tableName.toLowerCase()] || [];
+      tabContent.appendChild(table);
+    });
 
-      const extractFields = (obj) => {
-        return fieldsToKeep.length > 0
-          ? Object.fromEntries(Object.entries(obj).filter(([k]) => fieldsToKeep.includes(k)))
-          : obj;
-      };
-
-      tabEl.innerHTML = `
-        <table style="width: 100%; border-collapse: collapse;">
-          <thead>
-            <tr style="background-color: #f0f0f0;">
-              <th style="width: 33%; padding: 8px;">📂 Fichier 1</th>
-              <th style="width: 33%; padding: 8px;">📂 Fichier 2</th>
-              <th style="width: 34%; padding: 8px;">✅ Choix</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${contents.file1.map((item1, index) => {
-              const item2 = contents.file2[index] || {};
-              const html1 = Object.entries(extractFields(item1)).map(([k, v]) =>
-                `<div><strong>${labels[k] || k}</strong>: ${v}</div>`).join("");
-              const html2 = Object.entries(extractFields(item2)).map(([k, v]) =>
-                `<div><strong>${labels[k] || k}</strong>: ${v}</div>`).join("");
-
-              return `
-                <tr>
-                  <td style="padding: 6px; border: 1px solid #ccc;">${html1}</td>
-                  <td style="padding: 6px; border: 1px solid #ccc;">${html2}</td>
-                  <td style="padding: 6px; border: 1px solid #ccc;">
-                    <select data-table="${tableName}" data-index="${index}" class="merge-choice">
-                      <option value="both">Garder les deux</option>
-                      <option value="file1">Garder fichier 1</option>
-                      <option value="file2">Garder fichier 2</option>
-                      <option value="ignore">Ignorer</option>
-                    </select>
-                  </td>
-                </tr>`;
-            }).join("")}
-          </tbody>
-        </table>
-      `;
-    }
+    // Affiche la section
+    document.getElementById("preview-section").classList.remove("hidden");
+    showTab("notes");
   }
 
 
