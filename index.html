@@ -497,6 +497,53 @@
       animation: pulse 1.5s infinite;
     }
 
+    .preview-truncated {
+      max-height: 6em;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .preview-truncated .read-more {
+      color: #007bff;
+      cursor: pointer;
+      font-weight: bold;
+      display: inline-block;
+      margin-top: 5px;
+    }
+
+    /* Modale centrée */
+    #noteModal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.6);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+
+    #noteModal .modal-content {
+      background: white;
+      max-width: 600px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    }
+
+    #noteModalClose {
+      float: right;
+      cursor: pointer;
+      font-weight: bold;
+      color: #e74c3c;
+    }
+
+
 
 
 
@@ -630,6 +677,13 @@
 
   <div style="margin-top: 30px; text-align: center;">
     <button class="btn btn-primary" onclick="startMerge()">✅ Lancer la fusion finale</button>
+  </div>
+</div>
+
+<div id="noteModal">
+  <div class="modal-content">
+    <span id="noteModalClose">✖</span>
+    <div id="noteModalText"></div>
   </div>
 </div>
 
@@ -964,6 +1018,25 @@
       Name: "Catégorie"
     };
 
+    const limit = 300;
+
+    function escapeHTML(str) {
+      return str.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function renderField(key, value) {
+      if (key === "Content" && value.length > limit) {
+        const safeText = escapeHTML(value);
+        const preview = safeText.slice(0, limit) + "...";
+        return `
+          <div class="preview-truncated">
+            <strong>${labels[key] || key}</strong>: ${preview}
+            <span class="read-more" onclick="showFullNote(\`${safeText}\`)">[lire plus]</span>
+          </div>`;
+      }
+      return `<div><strong>${labels[key] || key}</strong>: ${escapeHTML(value)}</div>`;
+    }
+
     for (const [tableName, contents] of Object.entries(previewData)) {
       const tabEl = document.getElementById(`tab-${tableName.toLowerCase()}`);
       console.log(`🔍 Aperçu .${tableName} :`, contents);
@@ -976,8 +1049,8 @@
       const fieldsToKeep = fieldFilter[tableName.toLowerCase()] || [];
       const extractFields = (obj) => {
         return fieldsToKeep.length > 0
-          ? Object.fromEntries(Object.entries(obj || {}).filter(([k]) => fieldsToKeep.includes(k)))
-          : (obj || {});
+          ? Object.fromEntries(Object.entries(obj).filter(([k]) => fieldsToKeep.includes(k)))
+          : obj;
       };
 
       const maxLength = Math.max(contents.file1.length, contents.file2.length);
@@ -996,10 +1069,8 @@
               const item1 = contents.file1[index] || {};
               const item2 = contents.file2[index] || {};
 
-              const html1 = Object.entries(extractFields(item1)).map(([k, v]) =>
-                `<div><strong>${labels[k] || k}</strong>: ${v}</div>`).join("");
-              const html2 = Object.entries(extractFields(item2)).map(([k, v]) =>
-                `<div><strong>${labels[k] || k}</strong>: ${v}</div>`).join("");
+              const html1 = Object.entries(extractFields(item1)).map(([k, v]) => renderField(k, v)).join("");
+              const html2 = Object.entries(extractFields(item2)).map(([k, v]) => renderField(k, v)).join("");
 
               return `
                 <tr>
@@ -1021,6 +1092,21 @@
     }
   }
 
+
+  function showFullNote(content) {
+    document.getElementById("noteModalText").textContent = content;
+    document.getElementById("noteModal").style.display = "flex";
+  }
+
+  document.getElementById("noteModalClose").onclick = () => {
+    document.getElementById("noteModal").style.display = "none";
+  };
+
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      document.getElementById("noteModal").style.display = "none";
+    }
+  });
 
   function showTab(tabName) {
     // Masquer tous les contenus
