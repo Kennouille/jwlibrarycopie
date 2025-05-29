@@ -1018,21 +1018,20 @@
       Name: "Catégorie"
     };
 
-    const limit = 300;
-
     function escapeHTML(str) {
-      if (typeof str !== "string") {
-        if (str === null || str === undefined || str === "") return "<i style='color:#aaa'>(aucune donnée)</i>";
-        return String(str); // fallback
-      }
-      if (str.trim() === "") return "<i style='color:#aaa'>(aucune donnée)</i>";
-      return str.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      if (typeof str !== 'string') return '';
+      return str.replace(/[&<>'"]/g, tag => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        "'": '&#39;',
+        '"': '&quot;'
+      }[tag]));
     }
-
 
     function renderField(k, v, labels) {
       const label = labels[k] || k;
-      const escaped = escapeHTML(v);
+      const escaped = escapeHTML(v || '');
       const limit = 300;
       if (escaped.length > limit) {
         const short = escaped.slice(0, limit) + "…";
@@ -1047,7 +1046,6 @@
       return `<div><strong>${label}</strong>: ${escaped}</div>`;
     }
 
-
     for (const [tableName, contents] of Object.entries(previewData)) {
       const tabEl = document.getElementById(`tab-${tableName.toLowerCase()}`);
       console.log(`🔍 Aperçu .${tableName} :`, contents);
@@ -1059,6 +1057,7 @@
 
       const fieldsToKeep = fieldFilter[tableName.toLowerCase()] || [];
       const extractFields = (obj) => {
+        if (!obj) return {};
         return fieldsToKeep.length > 0
           ? Object.fromEntries(Object.entries(obj).filter(([k]) => fieldsToKeep.includes(k)))
           : obj;
@@ -1080,8 +1079,10 @@
               const item1 = contents.file1[index] || {};
               const item2 = contents.file2[index] || {};
 
-              const html1 = Object.entries(extractFields(item1)).map(([k, v]) => renderField(k, v)).join("");
-              const html2 = Object.entries(extractFields(item2)).map(([k, v]) => renderField(k, v)).join("");
+              const html1 = Object.entries(extractFields(item1)).map(([k, v]) =>
+                renderField(k, v, labels)).join("");
+              const html2 = Object.entries(extractFields(item2)).map(([k, v]) =>
+                renderField(k, v, labels)).join("");
 
               return `
                 <tr>
@@ -1102,6 +1103,7 @@
       `;
     }
   }
+
 
 
   function showFullNote(content) {
