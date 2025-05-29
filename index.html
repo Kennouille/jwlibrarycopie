@@ -1021,8 +1021,14 @@
     const limit = 300;
 
     function escapeHTML(str) {
+      if (typeof str !== "string") {
+        if (str === null || str === undefined || str === "") return "<i style='color:#aaa'>(aucune donnée)</i>";
+        return String(str); // fallback
+      }
+      if (str.trim() === "") return "<i style='color:#aaa'>(aucune donnée)</i>";
       return str.replace(/</g, "&lt;").replace(/>/g, "&gt;");
     }
+
 
     function renderField(key, value) {
       if (key === "Content" && value.length > limit) {
@@ -1034,7 +1040,7 @@
             <span class="read-more" onclick="showFullNote(\`${safeText}\`)">[lire plus]</span>
           </div>`;
       }
-      return `<div><strong>${labels[key] || key}</strong>: ${escapeHTML(value)}</div>`;
+      return `<div><strong>${label}</strong>: ${escaped || "<i style='color:#aaa'>(aucune donnée)</i>"}</div>`;
     }
 
     for (const [tableName, contents] of Object.entries(previewData)) {
