@@ -511,38 +511,44 @@
       margin-top: 5px;
     }
 
-    /* Modale centrée */
-    .modal {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
+    .note-modal {
       display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: rgba(0, 0, 0, 0.7);
       justify-content: center;
       align-items: center;
-      backdrop-filter: blur(3px);
-      background: rgba(0, 0, 0, 0.6);
       z-index: 9999;
     }
 
-    .modal-content {
+    .note-modal-content {
       background: white;
-      padding: 20px;
-      max-width: 80%;
-      max-height: 80%;
+      padding: 30px;
+      max-width: 600px;
+      max-height: 80vh;
       overflow-y: auto;
-      border-radius: 10px;
+      border-radius: 8px;
       position: relative;
+      box-shadow: 0 0 20px rgba(0,0,0,0.2);
     }
 
-    .close-btn {
+    .note-modal-close {
       position: absolute;
-      top: 5px;
-      right: 15px;
-      font-size: 24px;
+      top: 10px;
+      right: 10px;
+      background: #e74c3c;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 5px;
       cursor: pointer;
     }
+
+    .note-modal-text {
+      white-space: pre-wrap;
+      margin-top: 20px;
+    }
+
 
 
   </style>
@@ -677,12 +683,13 @@
   </div>
 </div>
 
-<div id="noteModal">
-  <div class="modal-content">
-    <span id="noteModalClose">✖</span>
-    <div id="noteModalText"></div>
+<div id="noteModal" class="note-modal">
+  <div class="note-modal-content">
+    <button id="noteModalClose" class="note-modal-close">Fermer</button>
+    <div id="noteModalText" class="note-modal-text"></div>
   </div>
 </div>
+
 
 <div id="errorDisplayWrapper" style="
   max-width: 800px;
@@ -1015,33 +1022,12 @@
       Name: "Catégorie"
     };
 
-    function escapeHTML(str) {
-      if (typeof str !== 'string') return '';
-      return str.replace(/[&<>'"]/g, tag => ({
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        "'": '&#39;',
-        '"': '&quot;'
-      }[tag]));
-    }
-
-    function renderField(k, v, labels) {
-      const label = labels[k] || k;
-      const escaped = escapeHTML(v || '');
-      const limit = 300;
-      if (escaped.length > limit) {
-        const short = escaped.slice(0, limit) + "…";
-        const safeId = `${Math.random().toString(36).substr(2, 9)}-${k}`;
-        return `
-          <div>
-            <strong>${label}</strong>:
-            <span id="${safeId}" class="note-snippet">${short}</span>
-            <a href="#" onclick="showFullNote('${escaped.replace(/'/g, "\\'")}', '${label}'); return false;">[…]</a>
-          </div>`;
-      }
-      return `<div><strong>${label}</strong>: ${escaped}</div>`;
-    }
+    const truncate = (text, maxLength = 300) => {
+      if (!text) return "";
+      return text.length > maxLength
+        ? `${text.substring(0, maxLength)}... <a href="#" onclick="showFullNote('${text.replace(/'/g, "\\'").replace(/"/g, '&quot;')}'); return false;">(voir tout)</a>`
+        : text;
+    };
 
     for (const [tableName, contents] of Object.entries(previewData)) {
       const tabEl = document.getElementById(`tab-${tableName.toLowerCase()}`);
@@ -1054,10 +1040,9 @@
 
       const fieldsToKeep = fieldFilter[tableName.toLowerCase()] || [];
       const extractFields = (obj) => {
-        if (!obj) return {};
         return fieldsToKeep.length > 0
-          ? Object.fromEntries(Object.entries(obj).filter(([k]) => fieldsToKeep.includes(k)))
-          : obj;
+          ? Object.fromEntries(Object.entries(obj || {}).filter(([k]) => fieldsToKeep.includes(k)))
+          : obj || {};
       };
 
       const maxLength = Math.max(contents.file1.length, contents.file2.length);
@@ -1075,11 +1060,10 @@
             ${Array.from({ length: maxLength }).map((_, index) => {
               const item1 = contents.file1[index] || {};
               const item2 = contents.file2[index] || {};
-
               const html1 = Object.entries(extractFields(item1)).map(([k, v]) =>
-                renderField(k, v, labels)).join("");
+                `<div><strong>${labels[k] || k}</strong>: ${truncate(v)}</div>`).join("");
               const html2 = Object.entries(extractFields(item2)).map(([k, v]) =>
-                renderField(k, v, labels)).join("");
+                `<div><strong>${labels[k] || k}</strong>: ${truncate(v)}</div>`).join("");
 
               return `
                 <tr>
@@ -1087,7 +1071,7 @@
                   <td style="padding: 6px; border: 1px solid #ccc;">${html2}</td>
                   <td style="padding: 6px; border: 1px solid #ccc;">
                     <select data-table="${tableName}" data-index="${index}" class="merge-choice">
-                      <option value="both" selected>Garder les deux</option>
+                      <option value="both">Garder les deux</option>
                       <option value="file1">Garder fichier 1</option>
                       <option value="file2">Garder fichier 2</option>
                       <option value="ignore">Ignorer</option>
@@ -1100,8 +1084,6 @@
       `;
     }
   }
-
-
 
   function showFullNote(content) {
     document.getElementById("noteModalText").textContent = content;
@@ -1117,6 +1099,7 @@
       document.getElementById("noteModal").style.display = "none";
     }
   });
+
 
   function showTab(tabName) {
     // Masquer tous les contenus
