@@ -1194,13 +1194,21 @@
     container.appendChild(meta);
     container.appendChild(table);
 
+    // 🔧 Ajout du container dans le DOM mais hors écran
+    container.style.position = "absolute";
+    container.style.left = "-9999px";
+    document.body.appendChild(container);
+
     html2pdf().set({
       margin: 10,
       filename: 'notes.pdf',
       html2canvas: { scale: 2 },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    }).from(container).save();
-  }
+    }).from(container).save().then(() => {
+      // Nettoyer après génération
+      document.body.removeChild(container);
+    });
+
 
   function showTab(tabName) {
     // Masquer tous les contenus
