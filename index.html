@@ -1318,7 +1318,17 @@
         const index = select.dataset.index;
         const value = select.value;
         if (!choices[table]) choices[table] = {};
-        choices[table][index] = value;
+
+        const editedFile1 = previewDataEdited[table]?.file1?.[index] || {};
+        const editedFile2 = previewDataEdited[table]?.file2?.[index] || {};
+
+        choices[table][index] = {
+          choice: value,
+          edited: {
+            file1: editedFile1,
+            file2: editedFile2
+          }
+        };
       });
 
       const response = await fetch(`${BASE_URL}/merge`, {
@@ -1329,10 +1339,7 @@
         },
         body: JSON.stringify({
           local_datetime: localDatetime,
-          conflicts_notes: choices.notes,
-          conflicts_bookmarks: choices.bookmarks,
-          conflicts_tags: choices.tags,
-          preview_data: previewDataEdited // ✅ les modifications utilisateur
+          choices: choices
         })
       });
 
