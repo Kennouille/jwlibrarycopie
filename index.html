@@ -1020,17 +1020,24 @@
     const escaped = escapeHTML(value || '');
     const id = `editable-${table}-${fileKey}-${index}-${field}`;
 
+    // Note : rendre le titre non modifiable
+    if (table === "notes" && field === "Title") {
+      return `<div><strong>${labels[field]} :</strong><br>
+        <input type="text" value="${escaped}" style="width:100%;" readonly></div>`;
+    }
+
     if (table === "notes" && field === "Content") {
       return `<div><strong>${labels[field]} :</strong><br>
         <textarea class="editable" id="${id}" data-table="${table}" data-file="${fileKey}" data-index="${index}" data-field="${field}" rows="4" style="width:100%;">${escaped}</textarea>
         <a href="#" class="show-full-note" data-content="${escaped}" data-label="${labels[field]}" style="display:inline-block;margin-top:5px;">🔍 Voir en grand</a>
       </div>`;
-    } else {
-      return `<div><strong>${labels[field]} :</strong><br>
-        <input type="text" class="editable" id="${id}" data-table="${table}" data-file="${fileKey}" data-index="${index}" data-field="${field}" value="${escaped}" style="width:100%;">
-      </div>`;
     }
+
+    return `<div><strong>${labels[field]} :</strong><br>
+      <input type="text" class="editable" id="${id}" data-table="${table}" data-file="${fileKey}" data-index="${index}" data-field="${field}" value="${escaped}" style="width:100%;">
+    </div>`;
   }
+
 
 
   function loadPreviewData(previewData) {
