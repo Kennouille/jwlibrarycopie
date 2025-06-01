@@ -1210,14 +1210,16 @@
     console.log("[PDF DEBUG] container HTML", container.innerHTML);
 
 
-    html2pdf().set({
-      margin: 10,
-      filename: 'notes.pdf',
-      html2canvas: { scale: 2 },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    }).from(container).save().then(() => {
-      document.body.removeChild(container);
-    });
+    setTimeout(() => {
+      html2pdf().set({
+        margin: 10,
+        filename: 'notes.pdf',
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      }).from(container).save().then(() => {
+        document.body.removeChild(container);
+      });
+    }, 500); // Délai de 500ms
   }
 
 
