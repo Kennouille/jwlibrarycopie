@@ -1145,6 +1145,35 @@
     }
   });
 
+  function exportNotesToPdf() {
+    const notesEl = document.getElementById("tab-notes");
+    const contentToPrint = notesEl.cloneNode(true);
+
+    // Supprimer le bouton d'impression du clone
+    const btn = contentToPrint.querySelector("#exportPdfBtn");
+    if (btn) btn.remove();
+
+    // Récupérer nombre de notes fichier 1 et 2
+    const file1Notes = contentToPrint.querySelectorAll('textarea[data-file="file1"]').length;
+    const file2Notes = contentToPrint.querySelectorAll('textarea[data-file="file2"]').length;
+
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('fr-FR') + ' ' + now.toLocaleTimeString('fr-FR');
+
+    const win = window.open('', '_blank');
+    win.document.write('<html><head><title>Notes</title>');
+    win.document.write('<style>body{font-family:sans-serif;} textarea, input{width:100%;} td{border:1px solid #ccc;padding:10px;} table{width:100%;border-collapse:collapse;} </style>');
+    win.document.write('</head><body>');
+    win.document.write(`<h1>Notes totales des 2 fichiers</h1>`);
+    win.document.write(`<p>📂 Fichier 1 : ${file1Notes} notes<br>📂 Fichier 2 : ${file2Notes} notes<br>🕒 Date : ${dateStr}</p>`);
+    win.document.write(contentToPrint.innerHTML);
+    win.document.write('</body></html>');
+    win.document.close();
+    win.focus();
+    win.print();
+    win.close();
+  }
+
 
   function showTab(tabName) {
     // Masquer tous les contenus
@@ -1165,6 +1194,17 @@
       btn.textContent.toLowerCase().includes(tabName)
     );
     if (clickedBtn) clickedBtn.classList.add('active');
+
+    if (tabName === "notes") {
+      if (!document.getElementById("exportPdfBtn")) {
+        const btn = document.createElement("button");
+        btn.id = "exportPdfBtn";
+        btn.textContent = "🖨️ Imprimer Notes en PDF";
+        btn.style.margin = "10px 0";
+        btn.onclick = exportNotesToPdf;
+        document.getElementById("tab-notes").prepend(btn);
+      }
+    }
   }
 
   document.addEventListener("click", function (e) {
