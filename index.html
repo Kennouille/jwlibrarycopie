@@ -1198,6 +1198,11 @@
 
     document.body.appendChild(container);
 
+    console.log("[PDF DEBUG] file1Notes", file1Notes);
+    console.log("[PDF DEBUG] file2Notes", file2Notes);
+    console.log("[PDF DEBUG] container HTML", container.innerHTML);
+
+
     html2pdf().set({
       margin: 10,
       filename: 'notes.pdf',
