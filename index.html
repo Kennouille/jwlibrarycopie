@@ -648,6 +648,10 @@
     <button class="tab-btn" onclick="showTab('tags')">🏷️ Catégories</button>
   </div>
 
+  <div style="margin-top: 30px; text-align: center;">
+    <button class="btn btn-primary" onclick="startMerge()">✅ Lancer la fusion finale</button>
+  </div>
+
   <div id="preview-content">
     <!-- Ces trois divs doivent exister et avoir les bons IDs -->
     <div id="tab-notes" class="tab-content hidden"></div>
@@ -1577,9 +1581,10 @@
       datetime: "Date et heure locales actuelles :",
       steps: ["Chargement", "Extraction", "Analyse", "Détection", "Prêt..."],
       mergeButton: "Charger, Extraire & Analyser",
-      summary: `La prévisualisation est prête. Pour bien comprendre : Ce que tu vas voir ci-dessous, ce sont uniquement les notes, les marque-pages et les catégories qui sont au même endroit dans la base de donnée JWlibrary.
-  De base, si 2 notes, 2 marque-pages ou 2 catégories sont différents, le programme garde les 2. S'ils sont identiques, le programme ne va en garder qu'un.<br><br>
-  <strong>💡 Une fois le téléchargement automatique effectué, tous les fichiers sont immédiatement effacés. Si le téléchargement ne s'est pas bien passé, actualise la page et renouvelle l'opération en entier.</strong>`,
+      summary: `La prévisualisation est prête. Pour bien comprendre : Ce que tu vas voir ci-dessous, ce sont uniquement les notes, les marque-pages et les catégories de la base de donnée JWlibrary.
+  De base, sans aucun changement, le programme analyse tout seul et, si 2 notes ou 2 marque-pages ou 2 catégories sont différents, le programme garde les 2. Si tu as 2 notes, 2 marque-pages ou 2 catégories identiques, le programme ne va en garder qu'un.<br><br>
+  Tu peux faire certains changements qui seront pris en compte lors de la fusion comme par exemple Modifier ou supprimer une note personnelle, modifier ou supprimer un marque-pages ou une catégorie.
+  <strong>💡 Si tu ne veux faire aucun changements, appuie sur le bouton ci-dessous: LANCER LA FUSION FINALE. Si tu veux faire des changements, tu peux les faire puis appuyer sur LANCER LA FUSION FINALE.</strong>`,
       progressReady: "Prêt à commencer...",
       final: "✅ Téléchargement terminé ou en cours.",
       errors: {
