@@ -712,7 +712,7 @@ def merge_notes(merged_db_path, db1_path, db2_path, location_id_map, usermark_gu
         row1 = notes1[index] if index < len(notes1) else None
         row2 = notes2[index] if index < len(notes2) else None
 
-        choice_data = note_choices.get(str(index), "file1")
+        choice_data = note_choices.get(str(index), "both")
         if isinstance(choice_data, str):
             choice = choice_data
             edited = {}
