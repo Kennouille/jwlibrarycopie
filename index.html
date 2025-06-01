@@ -1146,27 +1146,46 @@
   });
 
   function exportNotesToPdf() {
-    const notesEl = document.getElementById("tab-notes");
-    const contentToPrint = notesEl.cloneNode(true);
-
-    // Supprimer le bouton d'impression du clone
-    const btn = contentToPrint.querySelector("#exportPdfBtn");
-    if (btn) btn.remove();
-
-    // Récupérer nombre de notes fichier 1 et 2
-    const file1Notes = contentToPrint.querySelectorAll('textarea[data-file="file1"]').length;
-    const file2Notes = contentToPrint.querySelectorAll('textarea[data-file="file2"]').length;
+    const file1Notes = previewDataEdited.notes?.file1 || [];
+    const file2Notes = previewDataEdited.notes?.file2 || [];
 
     const now = new Date();
     const dateStr = now.toLocaleDateString('fr-FR') + ' ' + now.toLocaleTimeString('fr-FR');
 
     const win = window.open('', '_blank');
     win.document.write('<html><head><title>Notes</title>');
-    win.document.write('<style>body{font-family:sans-serif;} textarea, input{width:100%;} td{border:1px solid #ccc;padding:10px;} table{width:100%;border-collapse:collapse;} </style>');
+    win.document.write('<style>');
+    win.document.write('body { font-family: sans-serif; padding: 20px; }');
+    win.document.write('table { width: 100%; border-collapse: collapse; margin-top: 20px; }');
+    win.document.write('th, td { border: 1px solid #ccc; padding: 8px; vertical-align: top; }');
+    win.document.write('th { background: #f0f0f0; text-align: left; }');
+    win.document.write('h1 { margin-bottom: 5px; }');
+    win.document.write('p.meta { margin: 0 0 20px 0; }');
+    win.document.write('</style>');
     win.document.write('</head><body>');
-    win.document.write(`<h1>Notes totales des 2 fichiers</h1>`);
-    win.document.write(`<p>📂 Fichier 1 : ${file1Notes} notes<br>📂 Fichier 2 : ${file2Notes} notes<br>🕒 Date : ${dateStr}</p>`);
-    win.document.write(contentToPrint.innerHTML);
+
+    win.document.write('<h1>Notes totales des 2 fichiers</h1>');
+    win.document.write(`<p class="meta">📂 Fichier 1 : ${file1Notes.length} notes<br>📂 Fichier 2 : ${file2Notes.length} notes<br>🕒 Date : ${dateStr}</p>`);
+
+    win.document.write('<table>');
+    win.document.write('<thead><tr><th>Fichier 1</th><th>Fichier 2</th></tr></thead>');
+    win.document.write('<tbody>');
+
+    const maxLength = Math.max(file1Notes.length, file2Notes.length);
+    for (let i = 0; i < maxLength; i++) {
+      const note1 = file1Notes[i] || {};
+      const note2 = file2Notes[i] || {};
+
+      const html1 = `<strong>${note1.Title || ''}</strong><br>${(note1.Content || '').replace(/\n/g, '<br>')}`;
+      const html2 = `<strong>${note2.Title || ''}</strong><br>${(note2.Content || '').replace(/\n/g, '<br>')}`;
+
+      win.document.write('<tr>');
+      win.document.write(`<td>${html1}</td>`);
+      win.document.write(`<td>${html2}</td>`);
+      win.document.write('</tr>');
+    }
+
+    win.document.write('</tbody></table>');
     win.document.write('</body></html>');
     win.document.close();
     win.focus();
