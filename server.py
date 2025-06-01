@@ -737,10 +737,11 @@ def merge_notes(merged_db_path, db1_path, db2_path, location_id_map, usermark_gu
             (old_note_id, guid, usermark_guid, location_id, title, content,
              last_modified, created, block_type, block_identifier) = row
 
-            # Appliquer édition utilisateur
+            # Appliquer édition utilisateur selon source
             source_key = "file1" if os.path.normpath(source_db) == os.path.normpath(db1_path) else "file2"
-            title = edited.get(source_key, {}).get("Title", title)
-            content = edited.get(source_key, {}).get("Content", content)
+            if isinstance(choice_data, dict):
+                title = choice_data.get("edited", {}).get(source_key, {}).get("Title", title)
+                content = choice_data.get("edited", {}).get(source_key, {}).get("Content", content)
 
             normalized_key = (os.path.normpath(source_db), location_id)
             normalized_map = {(os.path.normpath(k[0]), k[1]): v for k, v in location_id_map.items()}
