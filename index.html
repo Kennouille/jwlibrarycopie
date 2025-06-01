@@ -1153,10 +1153,12 @@
     const now = new Date();
     const dateStr = now.toLocaleDateString('fr-FR') + ' ' + now.toLocaleTimeString('fr-FR');
 
-    // Créer un conteneur temporaire
+    // Créer un conteneur temporaire pour le contenu à exporter
     const container = document.createElement("div");
     container.style.fontFamily = "sans-serif";
     container.style.padding = "20px";
+    container.style.position = "absolute";
+    container.style.left = "-9999px";
 
     const title = document.createElement("h1");
     title.textContent = "Notes totales des 2 fichiers";
@@ -1194,9 +1196,6 @@
     container.appendChild(meta);
     container.appendChild(table);
 
-    // 🔧 Ajout du container dans le DOM mais hors écran
-    container.style.position = "absolute";
-    container.style.left = "-9999px";
     document.body.appendChild(container);
 
     html2pdf().set({
@@ -1205,9 +1204,9 @@
       html2canvas: { scale: 2 },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     }).from(container).save().then(() => {
-      // Nettoyer après génération
       document.body.removeChild(container);
     });
+  }
 
 
   function showTab(tabName) {
