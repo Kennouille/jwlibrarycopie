@@ -554,6 +554,7 @@
   </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/fflate@0.7.4/umd/index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
 <div class="container">
@@ -1152,47 +1153,54 @@
     const now = new Date();
     const dateStr = now.toLocaleDateString('fr-FR') + ' ' + now.toLocaleTimeString('fr-FR');
 
-    const win = window.open('', '_blank');
-    win.document.write('<html><head><title>Notes</title>');
-    win.document.write('<style>');
-    win.document.write('body { font-family: sans-serif; padding: 20px; }');
-    win.document.write('table { width: 100%; border-collapse: collapse; margin-top: 20px; }');
-    win.document.write('th, td { border: 1px solid #ccc; padding: 8px; vertical-align: top; }');
-    win.document.write('th { background: #f0f0f0; text-align: left; }');
-    win.document.write('h1 { margin-bottom: 5px; }');
-    win.document.write('p.meta { margin: 0 0 20px 0; }');
-    win.document.write('</style>');
-    win.document.write('</head><body>');
+    // Créer un conteneur temporaire
+    const container = document.createElement("div");
+    container.style.fontFamily = "sans-serif";
+    container.style.padding = "20px";
 
-    win.document.write('<h1>Notes totales des 2 fichiers</h1>');
-    win.document.write(`<p class="meta">📂 Fichier 1 : ${file1Notes.length} notes<br>📂 Fichier 2 : ${file2Notes.length} notes<br>🕒 Date : ${dateStr}</p>`);
+    const title = document.createElement("h1");
+    title.textContent = "Notes totales des 2 fichiers";
 
-    win.document.write('<table>');
-    win.document.write('<thead><tr><th>Fichier 1</th><th>Fichier 2</th></tr></thead>');
-    win.document.write('<tbody>');
+    const meta = document.createElement("p");
+    meta.innerHTML = `📂 Fichier 1 : ${file1Notes.length} notes<br>📂 Fichier 2 : ${file2Notes.length} notes<br>🕒 Date : ${dateStr}`;
 
-    const maxLength = Math.max(file1Notes.length, file2Notes.length);
-    for (let i = 0; i < maxLength; i++) {
-      const note1 = file1Notes[i] || {};
-      const note2 = file2Notes[i] || {};
+    const table = document.createElement("table");
+    table.style.width = "100%";
+    table.style.borderCollapse = "collapse";
+    table.innerHTML = `
+      <thead>
+        <tr>
+          <th style="border:1px solid #ccc;padding:8px;background:#f0f0f0;text-align:left;">Fichier 1</th>
+          <th style="border:1px solid #ccc;padding:8px;background:#f0f0f0;text-align:left;">Fichier 2</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${Array.from({ length: Math.max(file1Notes.length, file2Notes.length) }).map((_, i) => {
+          const note1 = file1Notes[i] || {};
+          const note2 = file2Notes[i] || {};
 
-      const html1 = `<strong>${note1.Title || ''}</strong><br>${(note1.Content || '').replace(/\n/g, '<br>')}`;
-      const html2 = `<strong>${note2.Title || ''}</strong><br>${(note2.Content || '').replace(/\n/g, '<br>')}`;
+          const html1 = `<strong>${note1.Title || ''}</strong><br>${(note1.Content || '').replace(/\n/g, '<br>')}`;
+          const html2 = `<strong>${note2.Title || ''}</strong><br>${(note2.Content || '').replace(/\n/g, '<br>')}`;
 
-      win.document.write('<tr>');
-      win.document.write(`<td>${html1}</td>`);
-      win.document.write(`<td>${html2}</td>`);
-      win.document.write('</tr>');
-    }
+          return `<tr>
+            <td style="border:1px solid #ccc;padding:8px;vertical-align:top;">${html1}</td>
+            <td style="border:1px solid #ccc;padding:8px;vertical-align:top;">${html2}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    `;
 
-    win.document.write('</tbody></table>');
-    win.document.write('</body></html>');
-    win.document.close();
-    win.focus();
-    win.print();
-    win.close();
+    container.appendChild(title);
+    container.appendChild(meta);
+    container.appendChild(table);
+
+    html2pdf().set({
+      margin: 10,
+      filename: 'notes.pdf',
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    }).from(container).save();
   }
-
 
   function showTab(tabName) {
     // Masquer tous les contenus
