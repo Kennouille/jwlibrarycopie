@@ -713,12 +713,12 @@ def merge_notes(merged_db_path, db1_path, db2_path, location_id_map, usermark_gu
         row2 = notes2[index] if index < len(notes2) else None
 
         choice_data = note_choices.get(str(index), "both")
-        if isinstance(choice_data, str):
-            choice = choice_data
-            edited = {}
-        else:
-            choice = choice_data.get("choice", "file1")
+        if isinstance(choice_data, dict):
+            choice = choice_data.get("choice", "both")
             edited = choice_data.get("edited", {})
+        else:
+            choice = choice_data
+            edited = note_choices.get(str(index), {}).get("edited", {})
 
         to_insert = []
         if choice == "file1" and row1:
