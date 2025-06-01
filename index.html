@@ -1192,9 +1192,13 @@
       </tbody>
     `;
 
-    container.appendChild(title);
-    container.appendChild(meta);
-    container.appendChild(table);
+    container.style.position = "fixed";
+    container.style.top = "0";
+    container.style.left = "0";
+    container.style.width = "100vw";
+    container.style.zIndex = "-1";
+    container.style.visibility = "hidden";
+
 
     document.body.appendChild(container);
 
