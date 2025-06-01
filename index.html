@@ -1007,8 +1007,31 @@
   }
 
 
+  let previewDataEdited = {}; // Pour stocker les modifications utilisateur
+
+  function escapeHTML(str) {
+    if (typeof str !== 'string') return '';
+    return str.replace(/[&<>'"]/g, tag => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+    }[tag]));
+  }
+
+  function renderEditableField(table, fileKey, index, field, value, labels) {
+    const escaped = escapeHTML(value || '');
+    const id = `editable-${table}-${fileKey}-${index}-${field}`;
+
+    if (table === "notes" && field === "Content") {
+      return `<div><strong>${labels[field]} :</strong><br>
+        <textarea class="editable" id="${id}" data-table="${table}" data-file="${fileKey}" data-index="${index}" data-field="${field}" rows="4" style="width:100%;">${escaped}</textarea></div>`;
+    } else {
+      return `<div><strong>${labels[field]} :</strong><br>
+        <input type="text" class="editable" id="${id}" data-table="${table}" data-file="${fileKey}" data-index="${index}" data-field="${field}" value="${escaped}" style="width:100%;"></div>`;
+    }
+  }
+
   function loadPreviewData(previewData) {
     document.getElementById("preview-section").classList.remove("hidden");
+    previewDataEdited = JSON.parse(JSON.stringify(previewData)); // Copie indépendante
 
     const fieldFilter = {
       notes: ["Title", "Content"],
@@ -1022,47 +1045,11 @@
       Name: "Catégorie"
     };
 
-    const truncate = (text, label, maxLength = 300) => {
-      if (!text) return "";
-      const escaped = escapeHTML(text);
-      if (escaped.length > maxLength) {
-        const short = escaped.slice(0, maxLength) + "…";
-        return `
-          <div>
-            <span>${short}</span>
-            <a href="#" class="show-full-note" data-content="${escaped}" data-label="${label}">[…]</a>
-          </div>`;
-      }
-      return `<div>${escaped}</div>`;
-    };
-
-    const escapeHTML = (str) => {
-      if (typeof str !== 'string') return '';
-      return str.replace(/[&<>'"]/g, tag => ({
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        "'": '&#39;',
-        '"': '&quot;'
-      }[tag]));
-    };
-
     for (const [tableName, contents] of Object.entries(previewData)) {
       const tabEl = document.getElementById(`tab-${tableName.toLowerCase()}`);
-      console.log(`🔍 Aperçu .${tableName} :`, contents);
-
-      if (!contents || !Array.isArray(contents.file1) || !Array.isArray(contents.file2)) {
-        console.warn(`⛔ Onglet manquant ou données invalides pour ${tableName}`);
-        continue;
-      }
+      if (!contents || !Array.isArray(contents.file1) || !Array.isArray(contents.file2)) continue;
 
       const fieldsToKeep = fieldFilter[tableName.toLowerCase()] || [];
-      const extractFields = (obj) => {
-        return fieldsToKeep.length > 0
-          ? Object.fromEntries(Object.entries(obj || {}).filter(([k]) => fieldsToKeep.includes(k)))
-          : obj || {};
-      };
-
       const maxLength = Math.max(contents.file1.length, contents.file2.length);
 
       tabEl.innerHTML = `
@@ -1078,10 +1065,14 @@
             ${Array.from({ length: maxLength }).map((_, index) => {
               const item1 = contents.file1[index] || {};
               const item2 = contents.file2[index] || {};
-              const html1 = Object.entries(extractFields(item1)).map(([k, v]) =>
-                `<div><strong>${labels[k] || k}</strong>: ${truncate(v, labels[k] || k)}</div>`).join("");
-              const html2 = Object.entries(extractFields(item2)).map(([k, v]) =>
-                `<div><strong>${labels[k] || k}</strong>: ${truncate(v, labels[k] || k)}</div>`).join("");
+
+              const html1 = fieldsToKeep.map(field =>
+                renderEditableField(tableName.toLowerCase(), "file1", index, field, item1[field], labels)
+              ).join("");
+
+              const html2 = fieldsToKeep.map(field =>
+                renderEditableField(tableName.toLowerCase(), "file2", index, field, item2[field], labels)
+              ).join("");
 
               return `
                 <tr>
@@ -1101,8 +1092,20 @@
         </table>
       `;
     }
-  }
 
+    document.querySelectorAll(".editable").forEach((el) => {
+      el.addEventListener("input", (e) => {
+        const { table, file, index, field } = e.target.dataset;
+        if (
+          previewDataEdited[table] &&
+          previewDataEdited[table][file] &&
+          previewDataEdited[table][file][index]
+        ) {
+          previewDataEdited[table][file][index][field] = e.target.value;
+        }
+      });
+    });
+  }
 
   function showFullNote(content) {
     document.getElementById("noteModalText").textContent = content;
@@ -1309,7 +1312,8 @@
           local_datetime: localDatetime,
           conflicts_notes: choices.notes,
           conflicts_bookmarks: choices.bookmarks,
-          conflicts_tags: choices.tags
+          conflicts_tags: choices.tags,
+          preview_data: previewDataEdited // ✅ les modifications utilisateur
         })
       });
 

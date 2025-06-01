@@ -583,7 +583,13 @@ def merge_bookmarks(merged_db_path, file1_db, file2_db, location_id_map, bookmar
         row1 = bookmarks1[index] if index < len(bookmarks1) else None
         row2 = bookmarks2[index] if index < len(bookmarks2) else None
 
-        choice = bookmark_choices.get(str(index), "file1")
+        choice_data = bookmark_choices.get(str(index), "file1")
+        if isinstance(choice_data, str):
+            choice = choice_data
+            edited = {}
+        else:
+            choice = choice_data.get("choice", "file1")
+            edited = choice_data.get("edited", {})
 
         to_insert = []
         if choice == "file1" and row1:
@@ -600,6 +606,10 @@ def merge_bookmarks(merged_db_path, file1_db, file2_db, location_id_map, bookmar
 
         for row, source_db in to_insert:
             old_id, loc_id, pub_loc_id, slot, title, snippet, block_type, block_id = row
+
+            # ✅ Appliquer modifications utilisateur si présentes
+            source_key = "file1" if os.path.normpath(source_db) == os.path.normpath(file1_db) else "file2"
+            title = edited.get(source_key, {}).get("Title", title)
 
             # Nouveau LocationId mappé
             new_loc_id = location_id_map.get((source_db, loc_id), loc_id)
@@ -671,7 +681,6 @@ def merge_bookmarks(merged_db_path, file1_db, file2_db, location_id_map, bookmar
 
     conn.commit()
     conn.close()
-
     print("✔ Fusion Bookmarks terminée (avec choix utilisateur).")
     return mapping
 
@@ -703,7 +712,13 @@ def merge_notes(merged_db_path, db1_path, db2_path, location_id_map, usermark_gu
         row1 = notes1[index] if index < len(notes1) else None
         row2 = notes2[index] if index < len(notes2) else None
 
-        choice = note_choices.get(str(index), "file1")
+        choice_data = note_choices.get(str(index), "file1")
+        if isinstance(choice_data, str):
+            choice = choice_data
+            edited = {}
+        else:
+            choice = choice_data.get("choice", "file1")
+            edited = choice_data.get("edited", {})
 
         to_insert = []
         if choice == "file1" and row1:
@@ -722,6 +737,11 @@ def merge_notes(merged_db_path, db1_path, db2_path, location_id_map, usermark_gu
             (old_note_id, guid, usermark_guid, location_id, title, content,
              last_modified, created, block_type, block_identifier) = row
 
+            # Appliquer édition utilisateur
+            source_key = "file1" if os.path.normpath(source_db) == os.path.normpath(db1_path) else "file2"
+            title = edited.get(source_key, {}).get("Title", title)
+            content = edited.get(source_key, {}).get("Content", content)
+
             normalized_key = (os.path.normpath(source_db), location_id)
             normalized_map = {(os.path.normpath(k[0]), k[1]): v for k, v in location_id_map.items()}
             new_location_id = normalized_map.get(normalized_key) if location_id else None
@@ -731,7 +751,6 @@ def merge_notes(merged_db_path, db1_path, db2_path, location_id_map, usermark_gu
                 print(f"⚠️ LocationId introuvable pour Note guid={guid} (source: {source_db}), ignorée.")
                 continue
 
-            # Vérifier si le GUID existe déjà
             cursor.execute("SELECT NoteId, Title, Content FROM Note WHERE Guid = ?", (guid,))
             existing = cursor.fetchone()
 
@@ -1439,9 +1458,6 @@ def compare_data():
 
 
 def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, location_id_map, item_id_map, tag_choices):
-    """
-    Fusionne Tags et TagMap avec prise en compte des choix utilisateur.
-    """
     print("\n[FUSION TAGS ET TAGMAP - AVEC CHOIX UTILISATEUR]")
 
     conn = sqlite3.connect(merged_db_path)
@@ -1465,7 +1481,6 @@ def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, loca
     """)
     conn.commit()
 
-    # Fusion des Tags (avec choix)
     cursor.execute("SELECT COALESCE(MAX(TagId), 0) FROM Tag")
     max_tag_id = cursor.fetchone()[0]
     tag_id_map = {}
@@ -1484,7 +1499,13 @@ def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, loca
         tag1 = tags1[index] if index < len(tags1) else None
         tag2 = tags2[index] if index < len(tags2) else None
 
-        choice = tag_choices.get(str(index), "file1")
+        choice_data = tag_choices.get(str(index), "file1")
+        if isinstance(choice_data, str):
+            choice = choice_data
+            edited = {}
+        else:
+            choice = choice_data.get("choice", "file1")
+            edited = choice_data.get("edited", {})
 
         to_insert = []
         if choice == "file1" and tag1:
@@ -1500,6 +1521,10 @@ def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, loca
             continue
 
         for (tag_id, tag_type, tag_name), db_path in to_insert:
+            # ✅ Modification si utilisateur a édité
+            source_key = "file1" if os.path.normpath(db_path) == os.path.normpath(file1_db) else "file2"
+            tag_name = edited.get(source_key, {}).get("Name", tag_name)
+
             cursor.execute("SELECT NewTagId FROM MergeMapping_Tag WHERE SourceDb = ? AND OldTagId = ?", (db_path, tag_id))
             res = cursor.fetchone()
             if res:
@@ -1518,7 +1543,7 @@ def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, loca
             tag_id_map[(db_path, tag_id)] = new_tag_id
             cursor.execute("INSERT INTO MergeMapping_Tag (SourceDb, OldTagId, NewTagId) VALUES (?, ?, ?)", (db_path, tag_id, new_tag_id))
 
-    # Fusion des TagMap (inchangée)
+    # TagMap inchangé
     cursor.execute("SELECT COALESCE(MAX(TagMapId), 0) FROM TagMap")
     max_tagmap_id = cursor.fetchone()[0]
     tagmap_id_map = {}
@@ -1587,7 +1612,7 @@ def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, loca
 
     conn.commit()
     conn.close()
-    print("Fusion des Tags et TagMap terminée (avec choix utilisateur).")
+    print("✔ Fusion des Tags et TagMap terminée (avec choix utilisateur).")
     return tag_id_map, tagmap_id_map
 
 
