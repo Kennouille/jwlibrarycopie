@@ -739,6 +739,9 @@ def merge_notes(merged_db_path, db1_path, db2_path, location_id_map, usermark_gu
 
             # Appliquer édition utilisateur selon source
             source_key = "file1" if os.path.normpath(source_db) == os.path.normpath(db1_path) else "file2"
+            print(f"[DEBUG] source_key = {source_key}")
+            print(f"[DEBUG] edited = {edited}")
+
             title = edited.get(source_key, {}).get("Title", title)
             content = edited.get(source_key, {}).get("Content", content)
 
