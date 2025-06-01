@@ -1153,69 +1153,69 @@
     const now = new Date();
     const dateStr = now.toLocaleDateString('fr-FR') + ' ' + now.toLocaleTimeString('fr-FR');
 
-    // Créer un conteneur temporaire pour le contenu à exporter
-    const container = document.createElement("div");
-    container.style.fontFamily = "sans-serif";
-    container.style.padding = "20px";
-    container.style.position = "absolute";
-    container.style.left = "-9999px";
-
-    const title = document.createElement("h1");
-    title.textContent = "Notes totales des 2 fichiers";
-
-    const meta = document.createElement("p");
-    meta.innerHTML = `📂 Fichier 1 : ${file1Notes.length} notes<br>📂 Fichier 2 : ${file2Notes.length} notes<br>🕒 Date : ${dateStr}`;
-
-    const table = document.createElement("table");
-    table.style.width = "100%";
-    table.style.borderCollapse = "collapse";
-    table.innerHTML = `
-      <thead>
-        <tr>
-          <th style="border:1px solid #ccc;padding:8px;background:#f0f0f0;text-align:left;">Fichier 1</th>
-          <th style="border:1px solid #ccc;padding:8px;background:#f0f0f0;text-align:left;">Fichier 2</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${Array.from({ length: Math.max(file1Notes.length, file2Notes.length) }).map((_, i) => {
-          const note1 = file1Notes[i] || {};
-          const note2 = file2Notes[i] || {};
-
-          const html1 = `<strong>${note1.Title || ''}</strong><br>${(note1.Content || '').replace(/\n/g, '<br>')}`;
-          const html2 = `<strong>${note2.Title || ''}</strong><br>${(note2.Content || '').replace(/\n/g, '<br>')}`;
-
-          return `<tr>
-            <td style="border:1px solid #ccc;padding:8px;vertical-align:top;">${html1}</td>
-            <td style="border:1px solid #ccc;padding:8px;vertical-align:top;">${html2}</td>
-          </tr>`;
-        }).join('')}
-      </tbody>
+    let htmlContent = `
+        <html>
+            <head>
+                <style>
+                    body { font-family: sans-serif; padding: 20px; }
+                    table { width: 100%; border-collapse: collapse; }
+                    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+                    th { background: #f0f0f0; }
+                </style>
+            </head>
+            <body>
+                <h1>Notes totales des 2 fichiers</h1>
+                <p>📂 Fichier 1 : ${file1Notes.length} notes<br>📂 Fichier 2 : ${file2Notes.length} notes<br>🕒 Date : ${dateStr}</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Fichier 1</th>
+                            <th>Fichier 2</th>
+                        </tr>
+                    </thead>
+                    <tbody>
     `;
 
-    container.style.position = "relative";
-    container.style.width = "100%";
-    container.style.visibility = "visible";
-    container.style.display = "block";
+    for (let i = 0; i < Math.max(file1Notes.length, file2Notes.length); i++) {
+        const note1 = file1Notes[i] || {};
+        const note2 = file2Notes[i] || {};
 
-    document.body.appendChild(container);
+        htmlContent += `
+            <tr>
+                <td style="vertical-align:top;">
+                    <strong>${note1.Title || ''}</strong><br>
+                    ${(note1.Content || '').replace(/\n/g, '<br>')}
+                </td>
+                <td style="vertical-align:top;">
+                    <strong>${note2.Title || ''}</strong><br>
+                    ${(note2.Content || '').replace(/\n/g, '<br>')}
+                </td>
+            </tr>
+        `;
+    }
 
-    console.log("[PDF DEBUG] file1Notes", file1Notes);
-    console.log("[PDF DEBUG] file2Notes", file2Notes);
-    console.log("[PDF DEBUG] container HTML", container.innerHTML);
+    htmlContent += `
+                    </tbody>
+                </table>
+            </body>
+        </html>
+    `;
 
+    // Créer un nouvel élément pour le PDF
+    const element = document.createElement('div');
+    element.innerHTML = htmlContent;
+    document.body.appendChild(element);
 
-    setTimeout(() => {
-      html2pdf().set({
+    // Générer le PDF
+    html2pdf().from(element).set({
         margin: 10,
         filename: 'notes.pdf',
         html2canvas: { scale: 2 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      }).from(container).save().then(() => {
-        document.body.removeChild(container);
-      });
-    }, 500); // Délai de 500ms
+    }).save().finally(() => {
+        document.body.removeChild(element);
+    });
   }
-
 
   function showTab(tabName) {
     // Masquer tous les contenus
