@@ -1119,7 +1119,7 @@
   }
 
   function showFullNote(content) {
-    document.getElementById("noteModalText").textContent = content;
+    document.getElementById("noteModalText").textContent = event.target.previousElementSibling?.value || content;
     document.getElementById("noteModal").style.display = "flex";
   }
 
@@ -1140,6 +1140,7 @@
       document.getElementById("noteModal").style.display = "none";
     }
   });
+
 
   function showTab(tabName) {
     // Masquer tous les contenus
