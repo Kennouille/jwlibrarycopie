@@ -1133,6 +1133,13 @@
     }
   });
 
+  // 🔴 Ajout : fermeture en cliquant à l'extérieur du contenu
+  document.getElementById("noteModal").addEventListener("click", (e) => {
+    const content = document.querySelector(".note-modal-content");
+    if (!content.contains(e.target)) {
+      document.getElementById("noteModal").style.display = "none";
+    }
+  });
 
   function showTab(tabName) {
     // Masquer tous les contenus
