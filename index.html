@@ -1045,12 +1045,11 @@
         tagByPosition[entry.Position] = entry.TagId;
       });
 
-      // Construction des 5 menus déroulants
+      // Construction des 5 menus déroulants, sans labels individuels
       let selectsHtml = "";
       for (let pos = 0; pos < 5; pos++) {
         const currentTagId = tagByPosition[pos] ?? "";
 
-        // Construire les options, en pré-sélectionnant si TagId === currentTagId
         const optionsHtml = [
           `<option value="">— Aucune catégorie —</option>`,
           ... (previewDataEdited.tags.list || []).map(cat => {
@@ -1060,9 +1059,6 @@
         ].join("");
 
         selectsHtml += `
-          <label for="cat-${table}-${fileKey}-${index}-${pos}" style="display:block; margin-top:4px;">
-            Catégorie ${pos + 1} :
-          </label>
           <select id="cat-${table}-${fileKey}-${index}-${pos}"
                   class="category-select"
                   data-table="${table}"
@@ -1081,6 +1077,8 @@
                   data-index="${index}" data-field="${field}" rows="4" style="width:100%;">${escaped}</textarea>
         <a href="#" class="show-full-note" data-content="${escaped}" data-label="${labels[field]}"
            style="display:inline-block;margin-top:5px;">🔍 Voir en grand</a>
+        <br><br>
+        <strong>Catégories :</strong>
         <br>
         ${selectsHtml}
       </div>`;
