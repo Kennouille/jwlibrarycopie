@@ -1090,31 +1090,31 @@
     document.getElementById("preview-section").classList.remove("hidden");
     previewDataEdited = JSON.parse(JSON.stringify(previewData)); // Copie indépendante
 
-    // ──────────────────────────────────────────────────────────────────────────────
-    //  INITIALISER previewDataEdited.tagMaps (vide pour futur "change")
-    // ──────────────────────────────────────────────────────────────────────────────
-    previewDataEdited.tagMaps = {
-      file1: {},
-      file2: {}
+    // Initialiser la structure tagMaps si elle n'existe pas
+    previewDataEdited.tagMaps = previewDataEdited.tagMaps || {
+        file1: {},
+        file2: {}
     };
 
-    // ──────────────────────────────────────────────────────────────────────────────
-    //  CONSTRUIRE previewDataEdited.tags.list
-    //  À partir de previewData.tags.file1 et previewData.tags.file2
-    // ──────────────────────────────────────────────────────────────────────────────
+    // Corriger l'accès aux données tags
+    previewDataEdited.tags = previewDataEdited.tags || {
+        file1: [],
+        file2: [],
+        list: []
+    };
+
+    // Construction de la liste unifiée des tags
     previewDataEdited.tags.list = [];
     const vu = new Set();
-    (previewData.tags.file1 || []).forEach(t => {
-      if (!vu.has(t.TagId)) {
-        previewDataEdited.tags.list.push({ TagId: t.TagId, Name: t.Name });
-        vu.add(t.TagId);
-      }
-    });
-    (previewData.tags.file2 || []).forEach(t => {
-      if (!vu.has(t.TagId)) {
-        previewDataEdited.tags.list.push({ TagId: t.TagId, Name: t.Name });
-        vu.add(t.TagId);
-      }
+
+    // Utiliser les données tags des fichiers si elles existent
+    [previewDataEdited.tags.file1 || [], previewDataEdited.tags.file2 || []].forEach(tagsArray => {
+        tagsArray.forEach(t => {
+            if (t && !vu.has(t.TagId)) {
+                previewDataEdited.tags.list.push({ TagId: t.TagId, Name: t.Name });
+                vu.add(t.TagId);
+            }
+        });
     });
 
     const fieldFilter = {
