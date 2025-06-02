@@ -1068,18 +1068,38 @@
     document.getElementById("preview-section").classList.remove("hidden");
     previewDataEdited = JSON.parse(JSON.stringify(previewData)); // Copie indépendante
 
-      // ──────────────────────────────────────────────────────────────────────────────
-      //  INITIALISER previewDataEdited.tagMaps
-      //  Structure : { file1: { [noteIndex]: { NoteId, TagId, Position } },
-      //               file2: { [noteIndex]: { NoteId, TagId, Position } } }
-      //  Au départ, vide ; on remplira dès qu’on change de catégorie.
-      // ──────────────────────────────────────────────────────────────────────────────
-      previewDataEdited.tagMaps = {
-        file1: {},
-        file2: {}
-      };
+    // ──────────────────────────────────────────────────────────────────────────────
+    //  INITIALISER previewDataEdited.tagMaps
+    //  Structure : { file1: { [noteIndex]: { NoteId, TagId, Position } },
+    //               file2: { [noteIndex]: { NoteId, TagId, Position } } }
+    //  Au départ, vide ; on remplira dès qu’on change de catégorie.
+    // ──────────────────────────────────────────────────────────────────────────────
+    previewDataEdited.tagMaps = {
+      file1: {},
+      file2: {}
+    };
 
-      const fieldFilter = {
+    // ──────────────────────────────────────────────────────────────────────────────
+    //  CONSTRUIRE previewDataEdited.tags.list
+    //  À partir de previewData.tags.file1 et previewData.tags.file2
+    //  Liste unique de { TagId, Name }
+    // ──────────────────────────────────────────────────────────────────────────────
+    previewDataEdited.tags.list = [];
+    const vu = new Set();
+    (previewData.tags.file1 || []).forEach(t => {
+      if (!vu.has(t.TagId)) {
+        previewDataEdited.tags.list.push({ TagId: t.TagId, Name: t.Name });
+        vu.add(t.TagId);
+      }
+    });
+    (previewData.tags.file2 || []).forEach(t => {
+      if (!vu.has(t.TagId)) {
+        previewDataEdited.tags.list.push({ TagId: t.TagId, Name: t.Name });
+        vu.add(t.TagId);
+      }
+    });
+
+    const fieldFilter = {
       notes: ["Title", "Content"],
       bookmarks: ["Title"],
       tags: ["Name"]
