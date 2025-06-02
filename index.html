@@ -1205,27 +1205,36 @@
       const note1 = file1Notes[i] || {};
       const note2 = file2Notes[i] || {};
 
-      // Note du fichier 1
       const title1 = note1.Title || 'Sans titre';
       const content1 = note1.Content || '';
-      doc.setFont(undefined, 'bold');
-      yPosition += addText(title1, 30, yPosition, 80);
-      doc.setFont(undefined, 'normal');
-      yPosition += addText(content1, 30, yPosition, 80);
-
-      // Note du fichier 2
       const title2 = note2.Title || 'Sans titre';
       const content2 = note2.Content || '';
-      doc.setFont(undefined, 'bold');
-      const height2 = addText(title2, 120, yPosition - (content1.split('\n').length * lineHeight), 80);
-      doc.setFont(undefined, 'normal');
-      addText(content2, 120, yPosition - (content1.split('\n').length * lineHeight) + height2, 80);
 
-      // Séparateur entre les notes
-      yPosition += 5;
+      // Calculer les hauteurs nécessaires
+      doc.setFont(undefined, 'bold');
+      const hTitle1 = addText(title1, 0, 0, 80); // juste pour mesurer
+      const hTitle2 = addText(title2, 0, 0, 80);
+      doc.setFont(undefined, 'normal');
+      const hContent1 = addText(content1, 0, 0, 80);
+      const hContent2 = addText(content2, 0, 0, 80);
+
+      const totalHeight = Math.max(hTitle1 + hContent1, hTitle2 + hContent2);
+
+      // Impression réelle
+      let yTop = yPosition;
+      doc.setFont(undefined, 'bold');
+      addText(title1, 30, yTop, 80);
+      addText(title2, 120, yTop, 80);
+      doc.setFont(undefined, 'normal');
+      yTop += Math.max(hTitle1, hTitle2);
+      addText(content1, 30, yTop, 80);
+      addText(content2, 120, yTop, 80);
+
+      yPosition += totalHeight + 10;
       doc.line(15, yPosition, 195, yPosition);
-      yPosition += 10;
+      yPosition += 5;
     }
+
 
     // Sauvegarde du PDF
     doc.save('notes.pdf');
