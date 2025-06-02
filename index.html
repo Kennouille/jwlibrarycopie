@@ -1207,6 +1207,8 @@
     const maxLength = Math.max(file1Notes.length, file2Notes.length);
 
     for (let i = 0; i < maxLength; i++) {
+      const espaceEntreTitreEtTexte = 4; // ← place-le ici
+
       // Vérifier si besoin d'une nouvelle page
       if (yPosition > 270) {
         doc.addPage();
@@ -1243,7 +1245,6 @@
       addText(title1, 30, yTop, 80);
       addText(title2, 120, yTop, 80);
       doc.setFont(undefined, 'normal');
-      const espaceEntreTitreEtTexte = 4;
       yTop += Math.max(hTitle1, hTitle2) + espaceEntreTitreEtTexte;
       addText(content1, 30, yTop, 80);
       addText(content2, 120, yTop, 80);
