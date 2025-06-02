@@ -1081,7 +1081,8 @@
     };
 
     // ──────────────────────────────────────────────────────────────────────────────
-    //  CONSTRUIRE previewDataEdited.tags.list (liste unique de catégories)
+    //  CONSTRUIRE previewDataEdited.tags.list
+    //  À partir de previewData.tags.file1 et previewData.tags.file2
     // ──────────────────────────────────────────────────────────────────────────────
     previewDataEdited.tags.list = [];
     const vu = new Set();
@@ -1097,6 +1098,7 @@
         vu.add(t.TagId);
       }
     });
+
 
     // ──────────────────────────────────────────────────────────────────────────────
     //  INITIALISER previewDataEdited.notes.[fileX][i].TagId
