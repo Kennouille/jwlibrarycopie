@@ -1045,11 +1045,12 @@
         tagByPosition[entry.Position] = entry.TagId;
       });
 
-      // Construction des 5 menus déroulants, sans labels individuels
+      // Construction des 5 menus déroulants
       let selectsHtml = "";
       for (let pos = 0; pos < 5; pos++) {
         const currentTagId = tagByPosition[pos] ?? "";
 
+        // Construire les options, en pré-sélectionnant si TagId === currentTagId
         const optionsHtml = [
           `<option value="">— Aucune catégorie —</option>`,
           ... (previewDataEdited.tags.list || []).map(cat => {
@@ -1059,6 +1060,9 @@
         ].join("");
 
         selectsHtml += `
+          <label for="cat-${table}-${fileKey}-${index}-${pos}" style="display:block; margin-top:4px;">
+            Catégorie ${pos + 1} :
+          </label>
           <select id="cat-${table}-${fileKey}-${index}-${pos}"
                   class="category-select"
                   data-table="${table}"
@@ -1077,12 +1081,11 @@
                   data-index="${index}" data-field="${field}" rows="4" style="width:100%;">${escaped}</textarea>
         <a href="#" class="show-full-note" data-content="${escaped}" data-label="${labels[field]}"
            style="display:inline-block;margin-top:5px;">🔍 Voir en grand</a>
-        <br><br>
-        <strong>Catégories :</strong>
         <br>
         ${selectsHtml}
       </div>`;
     }
+
   }
 
 
@@ -1090,31 +1093,52 @@
     document.getElementById("preview-section").classList.remove("hidden");
     previewDataEdited = JSON.parse(JSON.stringify(previewData)); // Copie indépendante
 
-    // Initialiser la structure tagMaps si elle n'existe pas
-    previewDataEdited.tagMaps = previewDataEdited.tagMaps || {
-        file1: {},
-        file2: {}
+    // Construire un dictionnaire NoteId → TagId pour chaque fichier
+    const mapNoteToTag_file1 = {};
+    (previewData.tagMaps.file1 || []).forEach(entry => {
+      mapNoteToTag_file1[entry.NoteId] = entry.TagId;
+    });
+    const mapNoteToTag_file2 = {};
+    (previewData.tagMaps.file2 || []).forEach(entry => {
+      mapNoteToTag_file2[entry.NoteId] = entry.TagId;
+    });
+
+    // Affecter noteObj.TagId à chaque note
+    (previewDataEdited.notes.file1 || []).forEach(noteObj => {
+      noteObj.TagId = mapNoteToTag_file1[noteObj.NoteId] ?? null;
+    });
+    (previewDataEdited.notes.file2 || []).forEach(noteObj => {
+      noteObj.TagId = mapNoteToTag_file2[noteObj.NoteId] ?? null;
+    });
+
+
+    // ──────────────────────────────────────────────────────────────────────────────
+    //  INITIALISER previewDataEdited.tagMaps
+    // ──────────────────────────────────────────────────────────────────────────────
+    previewDataEdited.tagMaps = {
+      file1: {},
+      file2: {}
     };
 
-    // Corriger l'accès aux données tags
-    previewDataEdited.tags = previewDataEdited.tags || {
-        file1: [],
-        file2: [],
-        list: []
-    };
-
-    // Construction de la liste unifiée des tags
+    // ──────────────────────────────────────────────────────────────────────────────
+    //  CONSTRUIRE previewDataEdited.tags.list
+    //  À partir de previewData.tags.file1 et previewData.tags.file2
+    // ──────────────────────────────────────────────────────────────────────────────
     previewDataEdited.tags.list = [];
     const vu = new Set();
 
-    // Utiliser les données tags des fichiers si elles existent
-    [previewDataEdited.tags.file1 || [], previewDataEdited.tags.file2 || []].forEach(tagsArray => {
-        tagsArray.forEach(t => {
-            if (t && !vu.has(t.TagId)) {
-                previewDataEdited.tags.list.push({ TagId: t.TagId, Name: t.Name });
-                vu.add(t.TagId);
-            }
-        });
+    // Ici previewData.tags existe et a la forme { file1: [...], file2: [...] }
+    (previewData.tags.file1 || []).forEach(t => {
+      if (!vu.has(t.TagId)) {
+        previewDataEdited.tags.list.push({ TagId: t.TagId, Name: t.Name });
+        vu.add(t.TagId);
+      }
+    });
+    (previewData.tags.file2 || []).forEach(t => {
+      if (!vu.has(t.TagId)) {
+        previewDataEdited.tags.list.push({ TagId: t.TagId, Name: t.Name });
+        vu.add(t.TagId);
+      }
     });
 
     const fieldFilter = {
@@ -1129,67 +1153,55 @@
       Name: "Catégorie"
     };
 
-    // ──────────────────────────────────────────────────────────────────────────────
-    //  RENDU DES 3 ONGLETS : notes, bookmarks, tags
-    //  (pour "tags", on utilise previewDataEdited.tags)
-    // ──────────────────────────────────────────────────────────────────────────────
-    // Note : ne pas parcourir previewData.tagMaps ici
     for (const tableName of ["notes", "bookmarks", "tags"]) {
-      const contents = (tableName === "tags")
-        ? previewDataEdited.tags
-        : previewData[tableName];
+      const contents = previewData[tableName];
+      const tabEl = document.getElementById(`tab-${tableName.toLowerCase()}`);
+      if (!contents || !Array.isArray(contents.file1) || !Array.isArray(contents.file2)) continue;
 
-      const tabEl = document.getElementById(`tab-${tableName}`);
-      if (!contents || !Array.isArray(contents.file1) || !Array.isArray(contents.file2)) {
-        tabEl.innerHTML = ""; // Onglet vide si structure inattendue
-        continue;
-      }
-
-      const fieldsToKeep = fieldFilter[tableName] || [];
+      const fieldsToKeep = fieldFilter[tableName.toLowerCase()] || [];
       const maxLength = Math.max(contents.file1.length, contents.file2.length);
 
-      let rowsHtml = "";
-      for (let index = 0; index < maxLength; index++) {
-        const item1 = contents.file1[index] || {};
-        const item2 = contents.file2[index] || {};
-
-        let html1 = "";
-        let html2 = "";
-        fieldsToKeep.forEach(field => {
-          html1 += renderEditableField(tableName, "file1", index, item1[field], field, labels);
-          html2 += renderEditableField(tableName, "file2", index, item2[field], field, labels);
-        });
-
-        rowsHtml += `
-          <tr>
-            <td style="padding:6px; border:1px solid #ccc;">${html1}</td>
-            <td style="padding:6px; border:1px solid #ccc;">${html2}</td>
-            <td style="padding:6px; border:1px solid #ccc;">
-              <select data-table="${tableName}" data-index="${index}" class="merge-choice">
-                <option value="both">Garder les deux</option>
-                <option value="file1">Garder fichier 1</option>
-                <option value="file2">Garder fichier 2</option>
-                <option value="ignore">Ignorer</option>
-              </select>
-            </td>
-          </tr>`;
-      }
-
       tabEl.innerHTML = `
-        <table style="width:100%; border-collapse:collapse;">
+        <table style="width: 100%; border-collapse: collapse;">
           <thead>
-            <tr style="background-color:#f0f0f0;">
-              <th style="width:33%; padding:8px;">📂 Fichier 1</th>
-              <th style="width:33%; padding:8px;">📂 Fichier 2</th>
-              <th style="width:34%; padding:8px;">✅ Choix</th>
+            <tr style="background-color: #f0f0f0;">
+              <th style="width: 33%; padding: 8px;">📂 Fichier 1</th>
+              <th style="width: 33%; padding: 8px;">📂 Fichier 2</th>
+              <th style="width: 34%; padding: 8px;">✅ Choix</th>
             </tr>
           </thead>
           <tbody>
-            ${rowsHtml}
+            ${Array.from({ length: maxLength }).map((_, index) => {
+              const item1 = contents.file1[index] || {};
+              const item2 = contents.file2[index] || {};
+
+              const html1 = fieldsToKeep.map(field =>
+                renderEditableField(tableName.toLowerCase(), "file1", index, field, item1[field], labels)
+              ).join("");
+
+              const html2 = fieldsToKeep.map(field =>
+                renderEditableField(tableName.toLowerCase(), "file2", index, field, item2[field], labels)
+              ).join("");
+
+              return `
+                <tr>
+                  <td style="padding: 6px; border: 1px solid #ccc;">${html1}</td>
+                  <td style="padding: 6px; border: 1px solid #ccc;">${html2}</td>
+                  <td style="padding: 6px; border: 1px solid #ccc;">
+                    <select data-table="${tableName}" data-index="${index}" class="merge-choice">
+                      <option value="both">Garder les deux</option>
+                      <option value="file1">Garder fichier 1</option>
+                      <option value="file2">Garder fichier 2</option>
+                      <option value="ignore">Ignorer</option>
+                    </select>
+                  </td>
+                </tr>`;
+            }).join("")}
           </tbody>
         </table>
       `;
     }
+
 
 
     document.querySelectorAll(".editable").forEach((el) => {
