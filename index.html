@@ -1146,75 +1146,112 @@
     }
   });
 
-  function exportNotesToPdf() {
+  async function exportNotesToPdf() {
     const file1Notes = previewDataEdited.notes?.file1 || [];
     const file2Notes = previewDataEdited.notes?.file2 || [];
 
     const now = new Date();
     const dateStr = now.toLocaleDateString('fr-FR') + ' ' + now.toLocaleTimeString('fr-FR');
 
+    // 1. Création du HTML complet sous forme de string
     let htmlContent = `
-        <html>
-            <head>
-                <style>
-                    body { font-family: sans-serif; padding: 20px; }
-                    table { width: 100%; border-collapse: collapse; }
-                    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-                    th { background: #f0f0f0; }
-                </style>
-            </head>
-            <body>
-                <h1>Notes totales des 2 fichiers</h1>
-                <p>📂 Fichier 1 : ${file1Notes.length} notes<br>📂 Fichier 2 : ${file2Notes.length} notes<br>🕒 Date : ${dateStr}</p>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Fichier 1</th>
-                            <th>Fichier 2</th>
-                        </tr>
-                    </thead>
-                    <tbody>
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1 { color: #333; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; }
+            .meta { margin-bottom: 20px; }
+          </style>
+        </head>
+        <body>
+          <h1>Notes totales des 2 fichiers</h1>
+          <div class="meta">
+            📂 Fichier 1 : ${file1Notes.length} notes<br>
+            📂 Fichier 2 : ${file2Notes.length} notes<br>
+            🕒 Date : ${dateStr}
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Fichier 1</th>
+                <th>Fichier 2</th>
+              </tr>
+            </thead>
+            <tbody>
     `;
 
-    for (let i = 0; i < Math.max(file1Notes.length, file2Notes.length); i++) {
-        const note1 = file1Notes[i] || {};
-        const note2 = file2Notes[i] || {};
+    // 2. Ajout dynamique des lignes de notes
+    const maxLength = Math.max(file1Notes.length, file2Notes.length);
+    for (let i = 0; i < maxLength; i++) {
+      const note1 = file1Notes[i] || {};
+      const note2 = file2Notes[i] || {};
 
-        htmlContent += `
-            <tr>
-                <td style="vertical-align:top;">
-                    <strong>${note1.Title || ''}</strong><br>
-                    ${(note1.Content || '').replace(/\n/g, '<br>')}
-                </td>
-                <td style="vertical-align:top;">
-                    <strong>${note2.Title || ''}</strong><br>
-                    ${(note2.Content || '').replace(/\n/g, '<br>')}
-                </td>
-            </tr>
-        `;
+      htmlContent += `
+        <tr>
+          <td>
+            <strong>${note1.Title || 'Sans titre'}</strong><br>
+            ${(note1.Content || '').replace(/\n/g, '<br>')}
+          </td>
+          <td>
+            <strong>${note2.Title || 'Sans titre'}</strong><br>
+            ${(note2.Content || '').replace(/\n/g, '<br>')}
+          </td>
+        </tr>
+      `;
     }
 
     htmlContent += `
-                    </tbody>
-                </table>
-            </body>
-        </html>
+            </tbody>
+          </table>
+        </body>
+      </html>
     `;
 
-    // Créer un nouvel élément pour le PDF
-    const element = document.createElement('div');
-    element.innerHTML = htmlContent;
-    document.body.appendChild(element);
+    // 3. Création d'un iframe invisible pour le rendu PDF
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '1px';
+    iframe.style.height = '1px';
+    iframe.style.opacity = '0';
+    iframe.style.pointerEvents = 'none';
+    iframe.srcdoc = htmlContent;
+    document.body.appendChild(iframe);
 
-    // Générer le PDF
-    html2pdf().from(element).set({
-        margin: 10,
-        filename: 'notes.pdf',
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    }).save().finally(() => {
-        document.body.removeChild(element);
+    // 4. Attendre que l'iframe soit chargé
+    await new Promise(resolve => {
+      iframe.onload = resolve;
     });
+
+    // 5. Génération du PDF avec un délai pour être sûr
+    setTimeout(() => {
+      html2pdf()
+        .set({
+          margin: 10,
+          filename: 'notes.pdf',
+          html2canvas: {
+            scale: 2,
+            logging: true,
+            useCORS: true
+          },
+          jsPDF: {
+            unit: 'mm',
+            format: 'a4',
+            orientation: 'portrait'
+          }
+        })
+        .from(iframe.contentDocument.body)
+        .save()
+        .then(() => {
+          document.body.removeChild(iframe);
+        });
+    }, 500);
   }
 
   function showTab(tabName) {
