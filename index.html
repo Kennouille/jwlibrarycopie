@@ -1160,7 +1160,7 @@
     });
 
     // Style de base
-    const fontSize = 12;
+    const fontSize = 9;
     const lineHeight = fontSize * 0.35;
     let yPosition = 30;
 
@@ -1235,9 +1235,10 @@
       addText(title1, 30, yTop, 80);
       addText(title2, 120, yTop, 80);
       doc.setFont(undefined, 'normal');
-      yTop += Math.max(hTitle1, hTitle2);
+      yTop += Math.max(hTitle1, hTitle2) + 2; // ← espace entre titre et texte
       addText(content1, 30, yTop, 80);
       addText(content2, 120, yTop, 80);
+
 
       yPosition += totalHeight + 10;
       doc.line(15, yPosition, 195, yPosition);
