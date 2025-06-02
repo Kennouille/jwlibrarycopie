@@ -1131,9 +1131,14 @@
 
     // ──────────────────────────────────────────────────────────────────────────────
     //  RENDU DES 3 ONGLETS : notes, bookmarks, tags
+    //  (pour "tags", on utilise previewDataEdited.tags)
     // ──────────────────────────────────────────────────────────────────────────────
+    // Note : ne pas parcourir previewData.tagMaps ici
     for (const tableName of ["notes", "bookmarks", "tags"]) {
-      const contents = previewData[tableName];
+      const contents = (tableName === "tags")
+        ? previewDataEdited.tags
+        : previewData[tableName];
+
       const tabEl = document.getElementById(`tab-${tableName}`);
       if (!contents || !Array.isArray(contents.file1) || !Array.isArray(contents.file2)) {
         tabEl.innerHTML = ""; // Onglet vide si structure inattendue
@@ -1143,18 +1148,16 @@
       const fieldsToKeep = fieldFilter[tableName] || [];
       const maxLength = Math.max(contents.file1.length, contents.file2.length);
 
-      // Génère le HTML du tableau
       let rowsHtml = "";
       for (let index = 0; index < maxLength; index++) {
         const item1 = contents.file1[index] || {};
         const item2 = contents.file2[index] || {};
 
-        // Pour chaque champ qu’on garde, on appelle renderEditableField
         let html1 = "";
         let html2 = "";
         fieldsToKeep.forEach(field => {
-          html1 += renderEditableField(tableName, "file1", index, field, item1[field], labels);
-          html2 += renderEditableField(tableName, "file2", index, field, item2[field], labels);
+          html1 += renderEditableField(tableName, "file1", index, item1[field], field, labels);
+          html2 += renderEditableField(tableName, "file2", index, item2[field], field, labels);
         });
 
         rowsHtml += `
@@ -1187,6 +1190,7 @@
         </table>
       `;
     }
+
 
     document.querySelectorAll(".editable").forEach((el) => {
       el.addEventListener("input", (e) => {
