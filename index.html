@@ -1147,111 +1147,87 @@
   });
 
   async function exportNotesToPdf() {
+    const { jsPDF } = window.jspdf;
     const file1Notes = previewDataEdited.notes?.file1 || [];
     const file2Notes = previewDataEdited.notes?.file2 || [];
 
+    // Création du PDF
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    // Style de base
+    const fontSize = 12;
+    const lineHeight = fontSize * 0.35;
+    let yPosition = 20;
+
+    // Fonction pour ajouter du texte avec gestion des sauts de ligne
+    const addText = (text, x, y, maxWidth) => {
+      const lines = doc.splitTextToSize(text, maxWidth);
+      doc.text(lines, x, y);
+      return lines.length * lineHeight;
+    };
+
+    // Titre
+    doc.setFontSize(16);
+    yPosition += addText('Notes totales des 2 fichiers', 105, yPosition, 180, { align: 'center' });
+    doc.setFontSize(fontSize);
+
+    // Métadonnées
     const now = new Date();
     const dateStr = now.toLocaleDateString('fr-FR') + ' ' + now.toLocaleTimeString('fr-FR');
+    yPosition += addText(`Fichier 1: ${file1Notes.length} notes | Fichier 2: ${file2Notes.length} notes | Date: ${dateStr}`, 15, yPosition + 10, 180);
 
-    // 1. Création du HTML complet sous forme de string
-    let htmlContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="UTF-8">
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; }
-            h1 { color: #333; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background-color: #f2f2f2; }
-            .meta { margin-bottom: 20px; }
-          </style>
-        </head>
-        <body>
-          <h1>Notes totales des 2 fichiers</h1>
-          <div class="meta">
-            📂 Fichier 1 : ${file1Notes.length} notes<br>
-            📂 Fichier 2 : ${file2Notes.length} notes<br>
-            🕒 Date : ${dateStr}
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Fichier 1</th>
-                <th>Fichier 2</th>
-              </tr>
-            </thead>
-            <tbody>
-    `;
+    // En-têtes de colonnes
+    doc.setFont(undefined, 'bold');
+    yPosition += addText('Fichier 1', 30, yPosition + 10, 80);
+    doc.text('Fichier 2', 120, yPosition);
+    doc.setFont(undefined, 'normal');
+    yPosition += lineHeight * 2;
 
-    // 2. Ajout dynamique des lignes de notes
+    // Ligne séparatrice
+    doc.line(15, yPosition, 195, yPosition);
+    yPosition += 5;
+
+    // Contenu des notes
     const maxLength = Math.max(file1Notes.length, file2Notes.length);
+
     for (let i = 0; i < maxLength; i++) {
+      // Vérifier si besoin d'une nouvelle page
+      if (yPosition > 270) {
+        doc.addPage();
+        yPosition = 20;
+      }
+
       const note1 = file1Notes[i] || {};
       const note2 = file2Notes[i] || {};
 
-      htmlContent += `
-        <tr>
-          <td>
-            <strong>${note1.Title || 'Sans titre'}</strong><br>
-            ${(note1.Content || '').replace(/\n/g, '<br>')}
-          </td>
-          <td>
-            <strong>${note2.Title || 'Sans titre'}</strong><br>
-            ${(note2.Content || '').replace(/\n/g, '<br>')}
-          </td>
-        </tr>
-      `;
+      // Note du fichier 1
+      const title1 = note1.Title || 'Sans titre';
+      const content1 = note1.Content || '';
+      doc.setFont(undefined, 'bold');
+      yPosition += addText(title1, 30, yPosition, 80);
+      doc.setFont(undefined, 'normal');
+      yPosition += addText(content1, 30, yPosition, 80);
+
+      // Note du fichier 2
+      const title2 = note2.Title || 'Sans titre';
+      const content2 = note2.Content || '';
+      doc.setFont(undefined, 'bold');
+      const height2 = addText(title2, 120, yPosition - (content1.split('\n').length * lineHeight), 80);
+      doc.setFont(undefined, 'normal');
+      addText(content2, 120, yPosition - (content1.split('\n').length * lineHeight) + height2, 80);
+
+      // Séparateur entre les notes
+      yPosition += 5;
+      doc.line(15, yPosition, 195, yPosition);
+      yPosition += 10;
     }
 
-    htmlContent += `
-            </tbody>
-          </table>
-        </body>
-      </html>
-    `;
-
-    // 3. Création d'un iframe invisible pour le rendu PDF
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '1px';
-    iframe.style.height = '1px';
-    iframe.style.opacity = '0';
-    iframe.style.pointerEvents = 'none';
-    iframe.srcdoc = htmlContent;
-    document.body.appendChild(iframe);
-
-    // 4. Attendre que l'iframe soit chargé
-    await new Promise(resolve => {
-      iframe.onload = resolve;
-    });
-
-    // 5. Génération du PDF avec un délai pour être sûr
-    setTimeout(() => {
-      html2pdf()
-        .set({
-          margin: 10,
-          filename: 'notes.pdf',
-          html2canvas: {
-            scale: 2,
-            logging: true,
-            useCORS: true
-          },
-          jsPDF: {
-            unit: 'mm',
-            format: 'a4',
-            orientation: 'portrait'
-          }
-        })
-        .from(iframe.contentDocument.body)
-        .save()
-        .then(() => {
-          document.body.removeChild(iframe);
-        });
-    }, 500);
+    // Sauvegarde du PDF
+    doc.save('notes.pdf');
   }
 
   function showTab(tabName) {
