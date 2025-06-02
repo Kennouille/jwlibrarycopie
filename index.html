@@ -1226,11 +1226,21 @@
 
         // Imprimer la j-ième ligne de la colonne 1, si elle existe
         if (j < lignes1.length) {
+          if (j < lignesTitle1.length) {
+            doc.setFont(undefined, 'bold');
+          } else {
+            doc.setFont(undefined, 'normal');
+          }
           doc.text(lignes1[j], 30, yPosition);
         }
 
         // Imprimer la j-ième ligne de la colonne 2, si elle existe
         if (j < lignes2.length) {
+          if (j < lignesTitle2.length) {
+            doc.setFont(undefined, 'bold');
+          } else {
+            doc.setFont(undefined, 'normal');
+          }
           doc.text(lignes2[j], 120, yPosition);
         }
 
@@ -1242,9 +1252,11 @@
         doc.addPage();
         yPosition = 20;
       }
+      doc.setFont(undefined, 'normal');
       doc.line(15, yPosition, 195, yPosition);
       yPosition += 8;
     }
+
 
     doc.save('notes.pdf');
   }
