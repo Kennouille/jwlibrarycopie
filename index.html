@@ -1129,7 +1129,8 @@
       Name: "Catégorie"
     };
 
-    for (const [tableName, contents] of Object.entries(previewData)) {
+    for (const tableName of ["notes", "bookmarks", "tags"]) {
+      const contents = previewData[tableName];
       const tabEl = document.getElementById(`tab-${tableName.toLowerCase()}`);
       if (!contents || !Array.isArray(contents.file1) || !Array.isArray(contents.file2)) continue;
 
