@@ -1203,6 +1203,7 @@
       const title2 = note2.Title || 'Sans titre';
       const content2 = note2.Content || '';
 
+      // Calculer hauteurs intermédiaires sans rien imprimer réellement
       doc.setFont(undefined, 'bold');
       const hTitle1 = addText(title1, 0, 0, 80);
       const hTitle2 = addText(title2, 0, 0, 80);
@@ -1210,36 +1211,39 @@
       const hContent1 = addText(content1, 0, 0, 80);
       const hContent2 = addText(content2, 0, 0, 80);
 
-      const espaceEntreTitreEtTexte = 5;
-      const blocHauteur =
-        Math.max(hTitle1 + hContent1, hTitle2 + hContent2) + espaceEntreTitreEtTexte;
+      const espaceEntreTitreEtTexte = 2;
+      // hauteur totale du bloc (titre + espace + contenu)
+      const hauteurBloc = Math.max(hTitle1 + hContent1, hTitle2 + hContent2) + espaceEntreTitreEtTexte;
 
-      if (yPosition + blocHauteur + 10 > 280) {
-        doc.addPage();
-        yPosition = 20;
-      }
-
+      // Impression réelle : toujours commencer au y actuel
       let yTop = yPosition;
 
-      // Titres
+      // Imprimer les titres
       doc.setFont(undefined, 'bold');
-      const printedHTitle1 = addText(title1, 30, yTop, 80);
-      const printedHTitle2 = addText(title2, 120, yTop, 80);
-      const titreMax = Math.max(printedHTitle1, printedHTitle2);
+      addText(title1, 30, yTop, 80);
+      addText(title2, 120, yTop, 80);
 
-      // Contenus
-      yTop += titreMax + espaceEntreTitreEtTexte;
+      // Imprimer le contenu immédiatement en dessous
+      yTop += Math.max(hTitle1, hTitle2) + espaceEntreTitreEtTexte;
       doc.setFont(undefined, 'normal');
       addText(content1, 30, yTop, 80);
       addText(content2, 120, yTop, 80);
 
-      // Fin du bloc
-      yPosition = yTop + Math.max(hContent1, hContent2) + 10;
+      // Calculer la position où se trouve le bas du bloc
+      let nouveauY = yPosition + hauteurBloc;
+
+      // Si le bas du bloc dépasse la page, passer à la page suivante avant la ligne
+      if (nouveauY + 10 > 280) {
+        doc.addPage();
+        yPosition = 20;
+      } else {
+        yPosition = nouveauY;
+      }
+
+      // Tracer la ligne de séparation à yPosition (jamais couper le bloc précédent)
       doc.line(15, yPosition, 195, yPosition);
-      yPosition += 10;
+      yPosition += 5;
     }
-
-
 
     doc.save('notes.pdf');
   }
