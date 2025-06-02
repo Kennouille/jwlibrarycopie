@@ -1203,47 +1203,48 @@
       const title2 = note2.Title || 'Sans titre';
       const content2 = note2.Content || '';
 
-      // Calculer hauteurs intermédiaires sans imprimer
-      doc.setFont(undefined, 'bold');
-      const hTitle1 = addText(title1, 0, 0, 80);
-      const hTitle2 = addText(title2, 0, 0, 80);
-      doc.setFont(undefined, 'normal');
-      const hContent1 = addText(content1, 0, 0, 80);
-      const hContent2 = addText(content2, 0, 0, 80);
+      // Préparer toutes les lignes de chaque colonne
+      const lignesTitle1 = doc.splitTextToSize(title1, 80);
+      const lignesContent1 = doc.splitTextToSize(content1, 80);
+      const lignes1 = [...lignesTitle1, ...Array(1).fill(''), ...lignesContent1];
 
-      const espaceEntreTitreEtTexte = 5;
-      // Hauteur totale du bloc (titre + espace + contenu)
-      const hauteurBloc = Math.max(hTitle1 + hContent1, hTitle2 + hContent2) + espaceEntreTitreEtTexte;
+      const lignesTitle2 = doc.splitTextToSize(title2, 80);
+      const lignesContent2 = doc.splitTextToSize(content2, 80);
+      const lignes2 = [...lignesTitle2, ...Array(1).fill(''), ...lignesContent2];
 
-      // Vérifier si ce bloc rentre sur la page actuelle
-      if (yPosition + hauteurBloc + 10 > 280) {
+      const espaceEntreTitreEtTexte = 2;
+      const hauteurLigne = lineHeight; // hauteur fixe par ligne
+
+      // On va itérer ligne par ligne, en coupant si nécessaire
+      const maxLignes = Math.max(lignes1.length, lignes2.length);
+      for (let j = 0; j < maxLignes; j++) {
+        // Avant d'imprimer la prochaine ligne, vérifier si la page est pleine
+        if (yPosition + hauteurLigne > 280) {
+          doc.addPage();
+          yPosition = 20;
+        }
+
+        // Imprimer la j-ième ligne de la colonne 1, si elle existe
+        if (j < lignes1.length) {
+          doc.text(lignes1[j], 30, yPosition);
+        }
+
+        // Imprimer la j-ième ligne de la colonne 2, si elle existe
+        if (j < lignes2.length) {
+          doc.text(lignes2[j], 120, yPosition);
+        }
+
+        yPosition += hauteurLigne;
+      }
+
+      // Après avoir imprimé toutes les lignes de la note, tracer la séparation
+      if (yPosition + 5 > 280) {
         doc.addPage();
         yPosition = 20;
       }
-
-      // À présent, on imprime en toute sécurité
-      let yTop = yPosition;
-
-      // Titres
-      doc.setFont(undefined, 'bold');
-      addText(title1, 30, yTop, 80);
-      addText(title2, 120, yTop, 80);
-
-      // Contenus (juste en-dessous des titres, avec espace)
-      yTop += Math.max(hTitle1, hTitle2) + espaceEntreTitreEtTexte;
-      doc.setFont(undefined, 'normal');
-      addText(content1, 30, yTop, 80);
-      addText(content2, 120, yTop, 80);
-
-      // Mettre yPosition à la fin du bloc imprimé
-      yPosition += hauteurBloc;
-
-      // Tracer la ligne de séparation juste en-dessous du bloc
-      yPosition += 3;      // léger espace avant la ligne
       doc.line(15, yPosition, 195, yPosition);
-      yPosition += 8;      // espace après la ligne pour redémarrer la note suivante
+      yPosition += 8;
     }
-
 
     doc.save('notes.pdf');
   }
