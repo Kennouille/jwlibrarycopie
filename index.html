@@ -1032,61 +1032,36 @@
         <input type="text" value="${escaped}" style="width:100%;" readonly></div>`;
     }
 
-
     if (table === "notes" && field === "Content") {
-      // Liste des TagId déjà affectés à cette note, indexés par Position
-      // previewDataEdited.tagMaps[fileKey][index] doit être un tableau d’objets { NoteId, TagId, Position }
-      const existingMaps = Array.isArray(previewDataEdited.tagMaps[fileKey]?.[index])
-        ? previewDataEdited.tagMaps[fileKey][index]
-        : [];
+      // --- début de la seule partie ajoutée ---
+      // Récupère l'ID de la catégorie actuelle pour cette note
+      const currentTagId = previewDataEdited.notes[fileKey]?.[index]?.TagId || "";
 
-      // On bâtit un petit dictionnaire Position → TagId
-      const tagByPosition = {};
-      existingMaps.forEach(entry => {
-        tagByPosition[entry.Position] = entry.TagId;
-      });
+      // Construit les <option> à partir de previewDataEdited.tags.list
+      const optionsHtml = (previewDataEdited.tags.list || []).map(cat => {
+        const selected = (String(cat.TagId) === String(currentTagId)) ? "selected" : "";
+        return `<option value="${cat.TagId}" ${selected}>${cat.Name}</option>`;
+      }).join("");
 
-      // Construction des 5 menus déroulants
-      let selectsHtml = "";
-      for (let pos = 0; pos < 5; pos++) {
-        const currentTagId = tagByPosition[pos] ?? "";
-
-        // Construire les options, en pré-sélectionnant si TagId === currentTagId
-        const optionsHtml = [
-          `<option value="">— Aucune catégorie —</option>`,
-          ... (previewDataEdited.tags.list || []).map(cat => {
-            const sel = String(cat.TagId) === String(currentTagId) ? "selected" : "";
-            return `<option value="${cat.TagId}" ${sel}>${cat.Name}</option>`;
-          })
-        ].join("");
-
-        selectsHtml += `
-          <label for="cat-${table}-${fileKey}-${index}-${pos}" style="display:block; margin-top:4px;">
-            Catégorie ${pos + 1} :
-          </label>
-          <select id="cat-${table}-${fileKey}-${index}-${pos}"
-                  class="category-select"
-                  data-table="${table}"
-                  data-file="${fileKey}"
-                  data-index="${index}"
-                  data-position="${pos}"
-                  style="width:100%; margin-bottom:8px;">
-            ${optionsHtml}
-          </select>
-        `;
-      }
-
+      // Retourne le textarea + bouton + dropdown
       return `<div>
         <strong>${labels[field]} :</strong><br>
-        <textarea class="editable" id="${id}" data-table="${table}" data-file="${fileKey}"
-                  data-index="${index}" data-field="${field}" rows="4" style="width:100%;">${escaped}</textarea>
-        <a href="#" class="show-full-note" data-content="${escaped}" data-label="${labels[field]}"
-           style="display:inline-block;margin-top:5px;">🔍 Voir en grand</a>
-        <br>
-        ${selectsHtml}
+        <textarea class="editable" id="${id}" data-table="${table}" data-file="${fileKey}" data-index="${index}" data-field="${field}" rows="4" style="width:100%;">${escaped}</textarea>
+        <a href="#" class="show-full-note" data-content="${escaped}" data-label="${labels[field]}" style="display:inline-block;margin-top:5px;">🔍 Voir en grand</a>
+        <br><br>
+        <label for="cat-${table}-${fileKey}-${index}">Catégorie :</label>
+        <select id="cat-${table}-${fileKey}-${index}" class="category-select"
+                data-table="${table}" data-file="${fileKey}" data-index="${index}"
+                style="width:100%; margin-top:4px;">
+          ${optionsHtml}
+        </select>
       </div>`;
+      // --- fin de la seule partie ajoutée ---
     }
 
+    return `<div><strong>${labels[field]} :</strong><br>
+      <input type="text" class="editable" id="${id}" data-table="${table}" data-file="${fileKey}" data-index="${index}" data-field="${field}" value="${escaped}" style="width:100%;">
+    </div>`;
   }
 
 
