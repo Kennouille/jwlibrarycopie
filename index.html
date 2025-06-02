@@ -1162,7 +1162,7 @@
     // Style de base
     const fontSize = 12;
     const lineHeight = fontSize * 0.35;
-    let yPosition = 20;
+    let yPosition = 30;
 
     // Fonction pour ajouter du texte avec gestion des sauts de ligne
     const addText = (text, x, y, maxWidth) => {
@@ -1171,22 +1171,27 @@
       return lines.length * lineHeight;
     };
 
-    // Titre
+    // Titre centré
     doc.setFontSize(16);
-    yPosition += addText('Notes totales des 2 fichiers', 105, yPosition, 180, { align: 'center' });
+    doc.text('Notes totales des 2 fichiers', 105, yPosition, { align: 'center' });
     doc.setFontSize(fontSize);
+    yPosition += 10;
 
     // Métadonnées
     const now = new Date();
     const dateStr = now.toLocaleDateString('fr-FR') + ' ' + now.toLocaleTimeString('fr-FR');
-    yPosition += addText(`Fichier 1: ${file1Notes.length} notes | Fichier 2: ${file2Notes.length} notes | Date: ${dateStr}`, 15, yPosition + 10, 180);
+    doc.text(`Fichier 1 : ${file1Notes.length} notes`, 15, yPosition);
+    doc.text(`Fichier 2 : ${file2Notes.length} notes`, 105, yPosition);
+    doc.text(`Date : ${dateStr}`, 15, yPosition + 7);
+    yPosition += 17;
 
     // En-têtes de colonnes
     doc.setFont(undefined, 'bold');
-    yPosition += addText('Fichier 1', 30, yPosition + 10, 80);
+    doc.text('Fichier 1', 30, yPosition);
     doc.text('Fichier 2', 120, yPosition);
     doc.setFont(undefined, 'normal');
-    yPosition += lineHeight * 2;
+    yPosition += 5;
+
 
     // Ligne séparatrice
     doc.line(15, yPosition, 195, yPosition);
