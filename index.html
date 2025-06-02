@@ -1207,21 +1207,7 @@
     const maxLength = Math.max(file1Notes.length, file2Notes.length);
 
     for (let i = 0; i < maxLength; i++) {
-      const espaceEntreTitreEtTexte = 4; // ← place-le ici
-
-      // Vérifier si besoin d'une nouvelle page
-      if (yPosition > 270) {
-        doc.addPage();
-        yPosition = 20;
-      }
-
-      const note1 = file1Notes[i] || {};
-      const note2 = file2Notes[i] || {};
-
-      const title1 = note1.Title || 'Sans titre';
-      const content1 = note1.Content || '';
-      const title2 = note2.Title || 'Sans titre';
-      const content2 = note2.Content || '';
+      const espaceEntreTitreEtTexte = 4;
 
       // Calculer les hauteurs nécessaires
       doc.setFont(undefined, 'bold');
@@ -1233,11 +1219,10 @@
 
       const totalNoteHeight = Math.max(hTitle1 + hContent1, hTitle2 + hContent2) + espaceEntreTitreEtTexte + 15;
 
-      if (yPosition + totalNoteHeight > 280) {  // marge de bas de page
+      if (yPosition + totalNoteHeight > 280) {
         doc.addPage();
         yPosition = 30;
       }
-
 
       // Impression réelle
       let yTop = yPosition;
@@ -1249,12 +1234,10 @@
       addText(content1, 30, yTop, 80);
       addText(content2, 120, yTop, 80);
 
-
-      yPosition += totalHeight + 10;
+      yPosition += totalNoteHeight;
       doc.line(15, yPosition, 195, yPosition);
       yPosition += 5;
     }
-
 
     // Sauvegarde du PDF
     doc.save('notes.pdf');
