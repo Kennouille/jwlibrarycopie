@@ -1203,7 +1203,7 @@
       const title2 = note2.Title || 'Sans titre';
       const content2 = note2.Content || '';
 
-      // Calculer hauteurs intermédiaires sans rien imprimer réellement
+      // Calculer hauteurs intermédiaires sans imprimer
       doc.setFont(undefined, 'bold');
       const hTitle1 = addText(title1, 0, 0, 80);
       const hTitle2 = addText(title2, 0, 0, 80);
@@ -1212,39 +1212,38 @@
       const hContent2 = addText(content2, 0, 0, 80);
 
       const espaceEntreTitreEtTexte = 5;
-      // hauteur totale du bloc (titre + espace + contenu)
+      // Hauteur totale du bloc (titre + espace + contenu)
       const hauteurBloc = Math.max(hTitle1 + hContent1, hTitle2 + hContent2) + espaceEntreTitreEtTexte;
 
-      // Impression réelle : toujours commencer au y actuel
+      // Vérifier si ce bloc rentre sur la page actuelle
+      if (yPosition + hauteurBloc + 10 > 280) {
+        doc.addPage();
+        yPosition = 20;
+      }
+
+      // À présent, on imprime en toute sécurité
       let yTop = yPosition;
 
-      // Imprimer les titres
+      // Titres
       doc.setFont(undefined, 'bold');
       addText(title1, 30, yTop, 80);
       addText(title2, 120, yTop, 80);
 
-      // Imprimer le contenu immédiatement en dessous
+      // Contenus (juste en-dessous des titres, avec espace)
       yTop += Math.max(hTitle1, hTitle2) + espaceEntreTitreEtTexte;
       doc.setFont(undefined, 'normal');
       addText(content1, 30, yTop, 80);
       addText(content2, 120, yTop, 80);
 
-      // Calculer la position où se trouve le bas du bloc
-      let nouveauY = yPosition + hauteurBloc;
+      // Mettre yPosition à la fin du bloc imprimé
+      yPosition += hauteurBloc;
 
-      // Si le bas du bloc dépasse la page, passer à la page suivante avant la ligne
-      if (nouveauY + 10 > 240) {
-        doc.addPage();
-        yPosition = 20;
-      } else {
-        yPosition = nouveauY;
-      }
-
-      // Tracer la ligne de séparation à yPosition (jamais couper le bloc précédent)
-      yPosition += 3; // descend la ligne
+      // Tracer la ligne de séparation juste en-dessous du bloc
+      yPosition += 3;      // léger espace avant la ligne
       doc.line(15, yPosition, 195, yPosition);
-      yPosition += 8;
+      yPosition += 8;      // espace après la ligne pour redémarrer la note suivante
     }
+
 
     doc.save('notes.pdf');
   }
