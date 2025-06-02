@@ -1211,7 +1211,7 @@
       const hContent1 = addText(content1, 0, 0, 80);
       const hContent2 = addText(content2, 0, 0, 80);
 
-      const espaceEntreTitreEtTexte = 2;
+      const espaceEntreTitreEtTexte = 5;
       // hauteur totale du bloc (titre + espace + contenu)
       const hauteurBloc = Math.max(hTitle1 + hContent1, hTitle2 + hContent2) + espaceEntreTitreEtTexte;
 
@@ -1233,7 +1233,7 @@
       let nouveauY = yPosition + hauteurBloc;
 
       // Si le bas du bloc dépasse la page, passer à la page suivante avant la ligne
-      if (nouveauY + 10 > 280) {
+      if (nouveauY + 10 > 240) {
         doc.addPage();
         yPosition = 20;
       } else {
@@ -1241,8 +1241,9 @@
       }
 
       // Tracer la ligne de séparation à yPosition (jamais couper le bloc précédent)
+      yPosition -= 8; // descend la ligne
       doc.line(15, yPosition, 195, yPosition);
-      yPosition += 5;
+      yPosition += 8;
     }
 
     doc.save('notes.pdf');
