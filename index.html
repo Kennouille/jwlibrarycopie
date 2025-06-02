@@ -1069,11 +1069,8 @@
     document.getElementById("preview-section").classList.remove("hidden");
     previewDataEdited = JSON.parse(JSON.stringify(previewData)); // Copie indépendante
 
-    console.log(">> previewData.tags =", previewData.tags);
-
-
     // ──────────────────────────────────────────────────────────────────────────────
-    //  INITIALISER previewDataEdited.tagMaps (vide pour le futur "change")
+    //  INITIALISER previewDataEdited.tagMaps
     // ──────────────────────────────────────────────────────────────────────────────
     previewDataEdited.tagMaps = {
       file1: {},
@@ -1086,6 +1083,8 @@
     // ──────────────────────────────────────────────────────────────────────────────
     previewDataEdited.tags.list = [];
     const vu = new Set();
+
+    // Ici previewData.tags existe et a la forme { file1: [...], file2: [...] }
     (previewData.tags.file1 || []).forEach(t => {
       if (!vu.has(t.TagId)) {
         previewDataEdited.tags.list.push({ TagId: t.TagId, Name: t.Name });
@@ -1099,38 +1098,6 @@
       }
     });
 
-
-    // ──────────────────────────────────────────────────────────────────────────────
-    //  INITIALISER previewDataEdited.notes.[fileX][i].TagId
-    //  À partir du tableau previewData.tagMaps.[fileX]
-    // ──────────────────────────────────────────────────────────────────────────────
-    // On crée un petit dictionnaire NoteId → TagId pour chaque fichier
-    const mapNoteToTag_file1 = {};
-    (previewData.tagMaps.file1 || []).forEach(entry => {
-      // entry = { NoteId: <n>, TagId: <m>, Position: <p> }
-      mapNoteToTag_file1[entry.NoteId] = entry.TagId;
-    });
-    const mapNoteToTag_file2 = {};
-    (previewData.tagMaps.file2 || []).forEach(entry => {
-      mapNoteToTag_file2[entry.NoteId] = entry.TagId;
-    });
-
-    // Maintenant, on parcourt chaque note dans previewDataEdited.notes.file1
-    // pour y ajouter le champ TagId venant de mapNoteToTag_file1
-    (previewDataEdited.notes.file1 || []).forEach((noteObj, idx) => {
-      const nid = noteObj.NoteId;
-      noteObj.TagId = mapNoteToTag_file1[nid] != null
-        ? mapNoteToTag_file1[nid]
-        : null;
-    });
-    // Pareil pour file2
-    (previewDataEdited.notes.file2 || []).forEach((noteObj, idx) => {
-      const nid = noteObj.NoteId;
-      noteObj.TagId = mapNoteToTag_file2[nid] != null
-        ? mapNoteToTag_file2[nid]
-        : null;
-    });
-
     const fieldFilter = {
       notes: ["Title", "Content"],
       bookmarks: ["Title"],
@@ -1142,7 +1109,6 @@
       Content: "Note",
       Name: "Catégorie"
     };
-
 
     for (const [tableName, contents] of Object.entries(previewData)) {
       const tabEl = document.getElementById(`tab-${tableName.toLowerCase()}`);
@@ -1191,6 +1157,8 @@
         </table>
       `;
     }
+  }
+
 
     document.querySelectorAll(".editable").forEach((el) => {
       el.addEventListener("input", (e) => {
