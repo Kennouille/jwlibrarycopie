@@ -1068,7 +1068,18 @@
     document.getElementById("preview-section").classList.remove("hidden");
     previewDataEdited = JSON.parse(JSON.stringify(previewData)); // Copie indépendante
 
-    const fieldFilter = {
+      // ──────────────────────────────────────────────────────────────────────────────
+      //  INITIALISER previewDataEdited.tagMaps
+      //  Structure : { file1: { [noteIndex]: { NoteId, TagId, Position } },
+      //               file2: { [noteIndex]: { NoteId, TagId, Position } } }
+      //  Au départ, vide ; on remplira dès qu’on change de catégorie.
+      // ──────────────────────────────────────────────────────────────────────────────
+      previewDataEdited.tagMaps = {
+        file1: {},
+        file2: {}
+      };
+
+      const fieldFilter = {
       notes: ["Title", "Content"],
       bookmarks: ["Title"],
       tags: ["Name"]
@@ -1320,8 +1331,54 @@
     }
   });
 
+  // ──────────────────────────────────────────────────────────────────────────────
+  // ÉCOUTEUR POUR LE MENU DEROULANT DE CATÉGORIE (class="category-select")
+  // ──────────────────────────────────────────────────────────────────────────────
+  document.addEventListener("change", function (e) {
+    if (!e.target.classList.contains("category-select")) return;
 
+    const table   = e.target.dataset.table;   // "notes"
+    const fileKey = e.target.dataset.file;    // "file1" ou "file2"
+    const index   = parseInt(e.target.dataset.index, 10);
+    const newTagId = parseInt(e.target.value, 10);
 
+    // Récupérer le NoteId
+    const noteObj = previewDataEdited.notes[fileKey]?.[index];
+    if (!noteObj || noteObj.NoteId == null) return;
+    const noteId = noteObj.NoteId;
+
+    // Supprimer éventuelle entrée précédente pour libérer la Position
+    const existing = previewDataEdited.tagMaps[fileKey][index];
+    if (existing) {
+      delete previewDataEdited.tagMaps[fileKey][index];
+    }
+
+    // Construire ensemble des positions déjà utilisées pour ce TagId
+    const usedPositions = new Set();
+    ["file1", "file2"].forEach(fk => {
+      Object.values(previewDataEdited.tagMaps[fk]).forEach(entry => {
+        if (entry.TagId === newTagId) {
+          usedPositions.add(entry.Position);
+        }
+      });
+    });
+
+    // Chercher la plus petite Position libre
+    let freePos = 0;
+    while (usedPositions.has(freePos)) {
+      freePos++;
+    }
+
+    // Mettre à jour previewDataEdited.tagMaps
+    previewDataEdited.tagMaps[fileKey][index] = {
+      NoteId: noteId,
+      TagId: newTagId,
+      Position: freePos
+    };
+
+    // Mettre à jour aussi previewDataEdited.notes avec le nouveau TagId
+    previewDataEdited.notes[fileKey][index].TagId = newTagId;
+  });
 
   function renderNotesPreview(data) {
     const tbody = document.getElementById("notes-preview-body");
