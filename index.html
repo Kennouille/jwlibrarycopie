@@ -816,15 +816,14 @@
     }
   }
 
-  async function uploadWithProgress(url, formData, startPercent = 20, targetPercent = 50) {
+  async function uploadWithProgress(url, formData) {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
 
       xhr.upload.onprogress = (e) => {
         if (e.lengthComputable) {
-          const percent = e.loaded / e.total;
-          const progress = startPercent + (targetPercent - startPercent) * percent;
-          updateProgress(progress, `Upload: ${Math.round(e.loaded / 1024)}KB/${Math.round(e.total / 1024)}KB`, 2);
+          const percent = Math.round((e.loaded / e.total) * 30);
+          updateProgress(20 + percent, `Upload: ${Math.round(e.loaded / 1024)}KB/${Math.round(e.total / 1024)}KB`, 2);
         }
       };
 
@@ -837,7 +836,6 @@
       xhr.send(formData);
     });
   }
-
 
   function showConstructionAnimation() {
       const container = document.getElementById('construction-container');
@@ -967,7 +965,7 @@
       formData.append("file2", new File([userData2], "userData2.db"));
 
       await updateProgress(30, "Téléversement...", 2);
-      await uploadWithProgress(`${BASE_URL}/upload`, formData, 20, 50);
+      await uploadWithProgress(`${BASE_URL}/upload`, formData);
 
       await updateProgress(60, "Préparation de l'aperçu...", 3);
       const previewRes = await fetch(`${BASE_URL}/prepare-preview`, {
@@ -1154,19 +1152,17 @@
     const file1Notes = previewDataEdited.notes?.file1 || [];
     const file2Notes = previewDataEdited.notes?.file2 || [];
 
-    // Création du PDF
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
       format: 'a4'
     });
 
-    // Style de base
     const fontSize = 8;
     const lineHeight = fontSize * 0.35;
+    const espaceEntreTitreEtTexte = 2;
     let yPosition = 30;
 
-    // Fonction pour ajouter du texte avec gestion des sauts de ligne
     const addText = (text, x, y, maxWidth) => {
       const lines = doc.splitTextToSize(text, maxWidth);
       if (x > 0 && y > 0) {
@@ -1175,15 +1171,11 @@
       return lines.length * lineHeight;
     };
 
-
-    // Titre centré
     doc.setFontSize(16);
     doc.text('Notes totales des 2 fichiers', 105, yPosition, { align: 'center' });
     doc.setFontSize(fontSize);
     yPosition += 12;
 
-
-    // Métadonnées
     const now = new Date();
     const dateStr = now.toLocaleDateString('fr-FR') + ' ' + now.toLocaleTimeString('fr-FR');
     doc.text(`Fichier 1 : ${file1Notes.length} notes`, 15, yPosition);
@@ -1191,40 +1183,40 @@
     doc.text(`Date : ${dateStr}`, 15, yPosition + 7);
     yPosition += 17;
 
-    // En-têtes de colonnes
     doc.setFont(undefined, 'bold');
     doc.text('Fichier 1', 30, yPosition);
     doc.text('Fichier 2', 120, yPosition);
     doc.setFont(undefined, 'normal');
     yPosition += 5;
 
-
-    // Ligne séparatrice
     doc.line(15, yPosition, 195, yPosition);
     yPosition += 5;
 
-    // Contenu des notes
     const maxLength = Math.max(file1Notes.length, file2Notes.length);
 
     for (let i = 0; i < maxLength; i++) {
-      const espaceEntreTitreEtTexte = 4;
+      const note1 = file1Notes[i] || {};
+      const note2 = file2Notes[i] || {};
 
-      // Calculer les hauteurs nécessaires
+      const title1 = note1.Title || 'Sans titre';
+      const content1 = note1.Content || '';
+      const title2 = note2.Title || 'Sans titre';
+      const content2 = note2.Content || '';
+
       doc.setFont(undefined, 'bold');
-      const hTitle1 = addText(title1, 0, 0, 80); // juste pour mesurer
+      const hTitle1 = addText(title1, 0, 0, 80);
       const hTitle2 = addText(title2, 0, 0, 80);
       doc.setFont(undefined, 'normal');
       const hContent1 = addText(content1, 0, 0, 80);
       const hContent2 = addText(content2, 0, 0, 80);
 
-      const totalNoteHeight = Math.max(hTitle1 + hContent1, hTitle2 + hContent2) + espaceEntreTitreEtTexte + 15;
+      const totalHeight = Math.max(hTitle1 + hContent1, hTitle2 + hContent2) + espaceEntreTitreEtTexte;
 
-      if (yPosition + totalNoteHeight > 280) {
+      if (yPosition + totalHeight + 10 > 280) {
         doc.addPage();
-        yPosition = 30;
+        yPosition = 20;
       }
 
-      // Impression réelle
       let yTop = yPosition;
       doc.setFont(undefined, 'bold');
       addText(title1, 30, yTop, 80);
@@ -1234,12 +1226,11 @@
       addText(content1, 30, yTop, 80);
       addText(content2, 120, yTop, 80);
 
-      yPosition += totalNoteHeight;
+      yPosition += totalHeight + 10;
       doc.line(15, yPosition, 195, yPosition);
       yPosition += 5;
     }
 
-    // Sauvegarde du PDF
     doc.save('notes.pdf');
   }
 
