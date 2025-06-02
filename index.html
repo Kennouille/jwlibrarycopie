@@ -912,7 +912,7 @@
       mergeButton.disabled = true;
 
       await updateProgress(5, "Préparation des fichiers...", 1);
-      await simulateProcessing(800, 20, "Chargement des fichiers...", 1);
+      await simulateProcessing(800, 15, "Chargement des fichiers...", 1);
 
       const zip1 = await JSZip.loadAsync(file1);
       const zip2 = await JSZip.loadAsync(file2);
@@ -1210,6 +1210,7 @@
       const hContent1 = addText(content1, 0, 0, 80);
       const hContent2 = addText(content2, 0, 0, 80);
 
+      const espaceEntreTitreEtTexte = 2;
       const totalHeight = Math.max(hTitle1 + hContent1, hTitle2 + hContent2) + espaceEntreTitreEtTexte;
 
       if (yPosition + totalHeight + 10 > 280) {
@@ -1226,10 +1227,11 @@
       addText(content1, 30, yTop, 80);
       addText(content2, 120, yTop, 80);
 
-      yPosition += totalHeight + 10;
+      yPosition = yTop + Math.max(hContent1, hContent2) + 10;
       doc.line(15, yPosition, 195, yPosition);
       yPosition += 5;
     }
+
 
     doc.save('notes.pdf');
   }
