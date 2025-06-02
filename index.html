@@ -1069,6 +1069,25 @@
     document.getElementById("preview-section").classList.remove("hidden");
     previewDataEdited = JSON.parse(JSON.stringify(previewData)); // Copie indépendante
 
+    // Construire un dictionnaire NoteId → TagId pour chaque fichier
+    const mapNoteToTag_file1 = {};
+    (previewData.tagMaps.file1 || []).forEach(entry => {
+      mapNoteToTag_file1[entry.NoteId] = entry.TagId;
+    });
+    const mapNoteToTag_file2 = {};
+    (previewData.tagMaps.file2 || []).forEach(entry => {
+      mapNoteToTag_file2[entry.NoteId] = entry.TagId;
+    });
+
+    // Affecter noteObj.TagId à chaque note
+    (previewDataEdited.notes.file1 || []).forEach(noteObj => {
+      noteObj.TagId = mapNoteToTag_file1[noteObj.NoteId] ?? null;
+    });
+    (previewDataEdited.notes.file2 || []).forEach(noteObj => {
+      noteObj.TagId = mapNoteToTag_file2[noteObj.NoteId] ?? null;
+    });
+
+
     // ──────────────────────────────────────────────────────────────────────────────
     //  INITIALISER previewDataEdited.tagMaps
     // ──────────────────────────────────────────────────────────────────────────────

@@ -179,6 +179,12 @@ def prepare_preview():
         tags1 = extract_table(conn1, "Tag")
         tags2 = extract_table(conn2, "Tag")
 
+        # Extraire TagMap pour chaque fichier et ne garder que les entrées liées à Note
+        tagmaps1_all = extract_table(conn1, "TagMap")
+        tagmaps1 = [entry for entry in tagmaps1_all if entry.get("NoteId") is not None]
+        tagmaps2_all = extract_table(conn2, "TagMap")
+        tagmaps2 = [entry for entry in tagmaps2_all if entry.get("NoteId") is not None]
+
         conn1.close()
         conn2.close()
 
@@ -195,6 +201,10 @@ def prepare_preview():
             "tags": {
                 "file1": tags1,
                 "file2": tags2
+            },
+            "tagMaps": {
+                "file1": tagmaps1,
+                "file2": tagmaps2
             }
         }
 
