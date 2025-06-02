@@ -964,7 +964,7 @@
       formData.append("file1", new File([userData1], "userData1.db"));
       formData.append("file2", new File([userData2], "userData2.db"));
 
-      await updateProgress(30, "Téléversement...", 2);
+      await updateProgress(20, "Téléversement...", 2);
       await uploadWithProgress(`${BASE_URL}/upload`, formData);
 
       await updateProgress(60, "Préparation de l'aperçu...", 3);
@@ -1211,26 +1211,34 @@
       const hContent2 = addText(content2, 0, 0, 80);
 
       const espaceEntreTitreEtTexte = 2;
-      const totalHeight = Math.max(hTitle1 + hContent1, hTitle2 + hContent2) + espaceEntreTitreEtTexte;
+      const blocHauteur =
+        Math.max(hTitle1 + hContent1, hTitle2 + hContent2) + espaceEntreTitreEtTexte;
 
-      if (yPosition + totalHeight + 10 > 280) {
+      if (yPosition + blocHauteur + 10 > 280) {
         doc.addPage();
         yPosition = 20;
       }
 
       let yTop = yPosition;
+
+      // Titres
       doc.setFont(undefined, 'bold');
-      addText(title1, 30, yTop, 80);
-      addText(title2, 120, yTop, 80);
+      const printedHTitle1 = addText(title1, 30, yTop, 80);
+      const printedHTitle2 = addText(title2, 120, yTop, 80);
+      const titreMax = Math.max(printedHTitle1, printedHTitle2);
+
+      // Contenus
+      yTop += titreMax + espaceEntreTitreEtTexte;
       doc.setFont(undefined, 'normal');
-      yTop += Math.max(hTitle1, hTitle2) + espaceEntreTitreEtTexte;
       addText(content1, 30, yTop, 80);
       addText(content2, 120, yTop, 80);
 
+      // Fin du bloc
       yPosition = yTop + Math.max(hContent1, hContent2) + 10;
       doc.line(15, yPosition, 195, yPosition);
       yPosition += 5;
     }
+
 
 
     doc.save('notes.pdf');
