@@ -816,14 +816,15 @@
     }
   }
 
-  async function uploadWithProgress(url, formData) {
+  async function uploadWithProgress(url, formData, startPercent = 20, targetPercent = 50) {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
 
       xhr.upload.onprogress = (e) => {
         if (e.lengthComputable) {
-          const percent = Math.round((e.loaded / e.total) * 30);
-          updateProgress(20 + percent, `Upload: ${Math.round(e.loaded / 1024)}KB/${Math.round(e.total / 1024)}KB`, 2);
+          const percent = e.loaded / e.total;
+          const progress = startPercent + (targetPercent - startPercent) * percent;
+          updateProgress(progress, `Upload: ${Math.round(e.loaded / 1024)}KB/${Math.round(e.total / 1024)}KB`, 2);
         }
       };
 
@@ -836,6 +837,7 @@
       xhr.send(formData);
     });
   }
+
 
   function showConstructionAnimation() {
       const container = document.getElementById('construction-container');
@@ -965,7 +967,7 @@
       formData.append("file2", new File([userData2], "userData2.db"));
 
       await updateProgress(30, "Téléversement...", 2);
-      await uploadWithProgress(`${BASE_URL}/upload`, formData);
+      await uploadWithProgress(`${BASE_URL}/upload`, formData, 20, 50);
 
       await updateProgress(60, "Préparation de l'aperçu...", 3);
       const previewRes = await fetch(`${BASE_URL}/prepare-preview`, {
@@ -1160,7 +1162,7 @@
     });
 
     // Style de base
-    const fontSize = 9;
+    const fontSize = 8;
     const lineHeight = fontSize * 0.35;
     let yPosition = 30;
 
@@ -1227,7 +1229,13 @@
       const hContent1 = addText(content1, 0, 0, 80);
       const hContent2 = addText(content2, 0, 0, 80);
 
-      const totalHeight = Math.max(hTitle1 + hContent1, hTitle2 + hContent2);
+      const totalNoteHeight = Math.max(hTitle1 + hContent1, hTitle2 + hContent2) + espaceEntreTitreEtTexte + 15;
+
+      if (yPosition + totalNoteHeight > 280) {  // marge de bas de page
+        doc.addPage();
+        yPosition = 30;
+      }
+
 
       // Impression réelle
       let yTop = yPosition;
@@ -1235,7 +1243,8 @@
       addText(title1, 30, yTop, 80);
       addText(title2, 120, yTop, 80);
       doc.setFont(undefined, 'normal');
-      yTop += Math.max(hTitle1, hTitle2) + 2; // ← espace entre titre et texte
+      const espaceEntreTitreEtTexte = 4;
+      yTop += Math.max(hTitle1, hTitle2) + espaceEntreTitreEtTexte;
       addText(content1, 30, yTop, 80);
       addText(content2, 120, yTop, 80);
 
