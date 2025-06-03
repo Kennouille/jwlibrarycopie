@@ -1039,7 +1039,7 @@
 
       // Construit les <option> à partir de previewDataEdited.tags.list
       const optionsHtml = [`<option value="">Aucune catégorie</option>`].concat(
-        (previewDataEdited.tags.list || []).map(cat => {
+        (previewDataEdited.tags[fileKey] || []).map(cat => {
           const selected = (String(cat.TagId) === String(currentTagId)) ? "selected" : "";
           return `<option value="${cat.TagId}" ${selected}>${cat.Name}</option>`;
         })
@@ -1103,22 +1103,27 @@
     //  CONSTRUIRE previewDataEdited.tags.list
     //  À partir de previewData.tags.file1 et previewData.tags.file2
     // ──────────────────────────────────────────────────────────────────────────────
-    previewDataEdited.tags.list = [];
-    const vu = new Set();
+    previewDataEdited.tags = {
+      file1: [],
+      file2: []
+    };
 
-    // Ici previewData.tags existe et a la forme { file1: [...], file2: [...] }
+    const seen1 = new Set();
     (previewData.tags.file1 || []).forEach(t => {
-      if (!vu.has(t.TagId)) {
-        previewDataEdited.tags.list.push({ TagId: t.TagId, Name: t.Name });
-        vu.add(t.TagId);
+      if (!seen1.has(t.TagId)) {
+        previewDataEdited.tags.file1.push({ TagId: t.TagId, Name: t.Name });
+        seen1.add(t.TagId);
       }
     });
+
+    const seen2 = new Set();
     (previewData.tags.file2 || []).forEach(t => {
-      if (!vu.has(t.TagId)) {
-        previewDataEdited.tags.list.push({ TagId: t.TagId, Name: t.Name });
-        vu.add(t.TagId);
+      if (!seen2.has(t.TagId)) {
+        previewDataEdited.tags.file2.push({ TagId: t.TagId, Name: t.Name });
+        seen2.add(t.TagId);
       }
     });
+
 
     const fieldFilter = {
       notes: ["Title", "Content"],
