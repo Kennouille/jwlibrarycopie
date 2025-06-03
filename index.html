@@ -1038,10 +1038,13 @@
       const currentTagId = previewDataEdited.notes[fileKey]?.[index]?.TagId || "";
 
       // Construit les <option> à partir de previewDataEdited.tags.list
-      const optionsHtml = (previewDataEdited.tags.list || []).map(cat => {
-        const selected = (String(cat.TagId) === String(currentTagId)) ? "selected" : "";
-        return `<option value="${cat.TagId}" ${selected}>${cat.Name}</option>`;
-      }).join("");
+      const optionsHtml = [`<option value="">Aucune catégorie</option>`].concat(
+        (previewDataEdited.tags.list || []).map(cat => {
+          const selected = (String(cat.TagId) === String(currentTagId)) ? "selected" : "";
+          return `<option value="${cat.TagId}" ${selected}>${cat.Name}</option>`;
+        })
+      ).join("");
+
 
       // Retourne le textarea + bouton + dropdown
       return `<div>
