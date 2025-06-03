@@ -1065,9 +1065,15 @@
     `;
   }
 
-  document.querySelector('[data-tab="Notes"]').addEventListener('click', () => {
-    refreshNotesTab();
+  document.addEventListener("DOMContentLoaded", function () {
+    const tabNotes = document.getElementById("tab-notes");
+    if (tabNotes) {
+      tabNotes.addEventListener("click", () => {
+        refreshNotesTab();
+      });
+    }
   });
+
 
 
   let previewDataEdited = {}; // Pour stocker les modifications utilisateur
