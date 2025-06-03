@@ -1051,12 +1051,19 @@
         <textarea class="editable" id="${id}" data-table="${table}" data-file="${fileKey}" data-index="${index}" data-field="${field}" rows="4" style="width:100%;">${escaped}</textarea>
         <a href="#" class="show-full-note" data-content="${escaped}" data-label="${labels[field]}" style="display:inline-block;margin-top:5px;">🔍 Voir en grand</a>
         <br><br>
-        <label for="cat-${table}-${fileKey}-${index}">Catégorie :</label>
-        <select id="cat-${table}-${fileKey}-${index}" class="category-select"
-                data-table="${table}" data-file="${fileKey}" data-index="${index}"
-                style="width:100%; margin-top:4px;">
-          ${optionsHtml}
-        </select>
+        <label>Catégories :</label><br>
+        ${[0, 1, 2].map(i => `
+          <select class="category-select"
+                  data-table="${table}" data-file="${fileKey}" data-index="${index}" data-cat-index="${i}"
+                  style="width:100%; margin-top:4px;">
+            <option value="">Aucune catégorie</option>
+            ${(previewDataEdited.tags[fileKey] || []).map(cat => {
+              const selected = (Array.isArray(previewDataEdited.notes[fileKey]?.[index]?.TagIds) &&
+                                String(previewDataEdited.notes[fileKey][index].TagIds[i]) === String(cat.TagId)) ? "selected" : "";
+              return `<option value="${cat.TagId}" ${selected}>${cat.Name}</option>`;
+            }).join("")}
+          </select>
+        `).join("")}
       </div>`;
       // --- fin de la seule partie ajoutée ---
     }
