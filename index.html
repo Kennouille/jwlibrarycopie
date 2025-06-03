@@ -1043,7 +1043,7 @@
         <a href="#" class="show-full-note" data-content="${escaped}" data-label="${labels[field]}" style="display:inline-block;margin-top:5px;">🔍 Voir en grand</a>
         <br><br>
         <label>Catégories :</label><br>
-        ${[0, 1, 2].map(i => {
+        ${[0, 1, 2, 3, 4].map(i => {
           const selectedId = String(tagIds[i] || "");
           const options = [`<option value="">Aucune catégorie</option>`]
             .concat(
