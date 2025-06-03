@@ -1012,6 +1012,63 @@
     }
   }
 
+  function refreshNotesTab() {
+    const tabEl = document.getElementById("tab-notes");
+    const contents = previewDataEdited.notes;
+
+    const labels = {
+      Title: "Titre",
+      Content: "Note"
+    };
+
+    const fieldsToKeep = ["Title", "Content"];
+    const maxLength = Math.max(contents.file1.length, contents.file2.length);
+
+    tabEl.innerHTML = `
+      <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr style="background-color: #f0f0f0;">
+            <th style="width: 33%; padding: 8px;">📂 Fichier 1</th>
+            <th style="width: 33%; padding: 8px;">📂 Fichier 2</th>
+            <th style="width: 34%; padding: 8px;">✅ Choix</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${Array.from({ length: maxLength }).map((_, index) => {
+            const item1 = contents.file1[index] || {};
+            const item2 = contents.file2[index] || {};
+
+            const html1 = fieldsToKeep.map(field =>
+              renderEditableField("notes", "file1", index, field, item1[field], labels)
+            ).join("");
+
+            const html2 = fieldsToKeep.map(field =>
+              renderEditableField("notes", "file2", index, field, item2[field], labels)
+            ).join("");
+
+            return `
+              <tr>
+                <td style="padding: 6px; border: 1px solid #ccc;">${html1}</td>
+                <td style="padding: 6px; border: 1px solid #ccc;">${html2}</td>
+                <td style="padding: 6px; border: 1px solid #ccc;">
+                  <select data-table="notes" data-index="${index}" class="merge-choice">
+                    <option value="both">Garder les deux</option>
+                    <option value="file1">Garder fichier 1</option>
+                    <option value="file2">Garder fichier 2</option>
+                    <option value="ignore">Ignorer</option>
+                  </select>
+                </td>
+              </tr>`;
+          }).join("")}
+        </tbody>
+      </table>
+    `;
+  }
+
+  document.querySelector('[data-tab="Notes"]').addEventListener('click', () => {
+    refreshNotesTab();
+  });
+
 
   let previewDataEdited = {}; // Pour stocker les modifications utilisateur
 
