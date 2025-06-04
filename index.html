@@ -1019,14 +1019,30 @@
   }
 
   function refreshNotesTab() {
-    const tabEl = document.getElementById("tab-notes");
     const contents = previewDataEdited.notes;
 
-    const labels = {
-      Title: "Titre",
-      Content: "Note"
-    };
+    // Recalcule les TagIds à partir des tagMaps
+    function buildNoteToTagIdsMap(tagMapArray) {
+      const result = {};
+      for (const { NoteId, TagId } of tagMapArray || []) {
+        if (!result[NoteId]) result[NoteId] = [];
+        result[NoteId].push(TagId);
+      }
+      return result;
+    }
 
+    const tagIdsMap1 = buildNoteToTagIdsMap(Object.values(previewDataEdited.tagMaps.file1));
+    const tagIdsMap2 = buildNoteToTagIdsMap(Object.values(previewDataEdited.tagMaps.file2));
+
+    (previewDataEdited.notes.file1 || []).forEach(note => {
+      note.TagIds = tagIdsMap1[note.NoteId] || [];
+    });
+    (previewDataEdited.notes.file2 || []).forEach(note => {
+      note.TagIds = tagIdsMap2[note.NoteId] || [];
+    });
+
+    const tabEl = document.getElementById("tab-notes");
+    const labels = { Title: "Titre", Content: "Note" };
     const fieldsToKeep = ["Title", "Content"];
     const maxLength = Math.max(contents.file1.length, contents.file2.length);
 
@@ -1071,11 +1087,12 @@
     `;
   }
 
+
   document.addEventListener("DOMContentLoaded", function () {
     const tabNotes = document.getElementById("tab-notes");
     if (tabNotes) {
       tabNotes.addEventListener("click", () => {
-        // refreshNotesTab();
+        refreshNotesTab();
       });
     }
   });
