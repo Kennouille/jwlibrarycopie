@@ -1018,87 +1018,6 @@
     }
   }
 
-  function refreshNotesTab() {
-    const contents = previewDataEdited.notes;
-
-    // Recalcule les TagIds à partir des tagMaps
-    function buildNoteToTagIdsMap(tagMapArray) {
-      const result = {};
-      for (const { NoteId, TagId } of tagMapArray || []) {
-        if (!result[NoteId]) result[NoteId] = [];
-        result[NoteId].push(TagId);
-      }
-      return result;
-    }
-
-    const tagIdsMap1 = buildNoteToTagIdsMap(Object.values(previewDataEdited.tagMaps.file1));
-    const tagIdsMap2 = buildNoteToTagIdsMap(Object.values(previewDataEdited.tagMaps.file2));
-
-    (previewDataEdited.notes.file1 || []).forEach(note => {
-      note.TagIds = tagIdsMap1[note.NoteId] || [];
-    });
-    (previewDataEdited.notes.file2 || []).forEach(note => {
-      note.TagIds = tagIdsMap2[note.NoteId] || [];
-    });
-
-    const tabEl = document.getElementById("tab-notes");
-    const labels = { Title: "Titre", Content: "Note" };
-    const fieldsToKeep = ["Title", "Content"];
-    const maxLength = Math.max(contents.file1.length, contents.file2.length);
-
-    tabEl.innerHTML = `
-      <table style="width: 100%; border-collapse: collapse;">
-        <thead>
-          <tr style="background-color: #f0f0f0;">
-            <th style="width: 33%; padding: 8px;">📂 Fichier 1</th>
-            <th style="width: 33%; padding: 8px;">📂 Fichier 2</th>
-            <th style="width: 34%; padding: 8px;">✅ Choix</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${Array.from({ length: maxLength }).map((_, index) => {
-            const item1 = contents.file1[index] || {};
-            const item2 = contents.file2[index] || {};
-
-            const html1 = fieldsToKeep.map(field =>
-              renderEditableField("notes", "file1", index, field, item1[field], labels)
-            ).join("");
-
-            const html2 = fieldsToKeep.map(field =>
-              renderEditableField("notes", "file2", index, field, item2[field], labels)
-            ).join("");
-
-            return `
-              <tr>
-                <td style="padding: 6px; border: 1px solid #ccc;">${html1}</td>
-                <td style="padding: 6px; border: 1px solid #ccc;">${html2}</td>
-                <td style="padding: 6px; border: 1px solid #ccc;">
-                  <select data-table="notes" data-index="${index}" class="merge-choice">
-                    <option value="both">Garder les deux</option>
-                    <option value="file1">Garder fichier 1</option>
-                    <option value="file2">Garder fichier 2</option>
-                    <option value="ignore">Ignorer</option>
-                  </select>
-                </td>
-              </tr>`;
-          }).join("")}
-        </tbody>
-      </table>
-    `;
-  }
-
-
-  document.addEventListener("DOMContentLoaded", function () {
-    const tabNotes = document.getElementById("tab-notes");
-    if (tabNotes) {
-      tabNotes.addEventListener("click", () => {
-        refreshNotesTab();
-      });
-    }
-  });
-
-
-
   let previewDataEdited = {}; // Pour stocker les modifications utilisateur
 
   function escapeHTML(str) {
@@ -1185,8 +1104,7 @@
     };
 
     // ──────────────────────────────────────────────────────────────────────────────
-    //  CONSTRUIRE previewDataEdited.tags.list
-    //  À partir de previewData.tags.file1 et previewData.tags.file2
+    //  CONSTRUIRE previewDataEdited.tags.list PAR FICHIER
     // ──────────────────────────────────────────────────────────────────────────────
     previewDataEdited.tags = {
       file1: [],
@@ -1209,7 +1127,6 @@
       }
     });
 
-
     const fieldFilter = {
       notes: ["Title", "Content"],
       bookmarks: ["Title"],
@@ -1222,7 +1139,66 @@
       Name: "Catégorie"
     };
 
-    for (const tableName of ["notes", "bookmarks", "tags"]) {
+    // ──────────────────────────────────────────────────────────────────────────────
+    // Fonction réutilisable pour générer l’onglet Notes
+    // ──────────────────────────────────────────────────────────────────────────────
+    function buildNotesTab() {
+      const contents = previewDataEdited.notes;
+      const fieldsToKeep = ["Title", "Content"];
+      const maxLength = Math.max(contents.file1.length, contents.file2.length);
+      const tabEl = document.getElementById("tab-notes");
+
+      tabEl.innerHTML = `
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr style="background-color: #f0f0f0;">
+              <th style="width: 33%; padding: 8px;">📂 Fichier 1</th>
+              <th style="width: 33%; padding: 8px;">📂 Fichier 2</th>
+              <th style="width: 34%; padding: 8px;">✅ Choix</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${Array.from({ length: maxLength }).map((_, index) => {
+              const item1 = contents.file1[index] || {};
+              const item2 = contents.file2[index] || {};
+
+              const html1 = fieldsToKeep.map(field =>
+                renderEditableField("notes", "file1", index, field, item1[field], labels)
+              ).join("");
+
+              const html2 = fieldsToKeep.map(field =>
+                renderEditableField("notes", "file2", index, field, item2[field], labels)
+              ).join("");
+
+              return `
+                <tr>
+                  <td style="padding: 6px; border: 1px solid #ccc;">${html1}</td>
+                  <td style="padding: 6px; border: 1px solid #ccc;">${html2}</td>
+                  <td style="padding: 6px; border: 1px solid #ccc;">
+                    <select data-table="notes" data-index="${index}" class="merge-choice">
+                      <option value="both">Garder les deux</option>
+                      <option value="file1">Garder fichier 1</option>
+                      <option value="file2">Garder fichier 2</option>
+                      <option value="ignore">Ignorer</option>
+                    </select>
+                  </td>
+                </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    // 👇 expose la fonction pour la réutiliser ailleurs
+    window.refreshNotesTab = buildNotesTab;
+
+    // 👇 première construction immédiate de l'onglet Notes
+    buildNotesTab();
+
+    // ──────────────────────────────────────────────────────────────────────────────
+    // Rendu des autres onglets : Bookmarks et Tags
+    // ──────────────────────────────────────────────────────────────────────────────
+    for (const tableName of ["bookmarks", "tags"]) {
       const contents = previewData[tableName];
       const tabEl = document.getElementById(`tab-${tableName.toLowerCase()}`);
       if (!contents || !Array.isArray(contents.file1) || !Array.isArray(contents.file2)) continue;
@@ -1271,6 +1247,12 @@
       `;
     }
 
+
+    document.getElementById("tab-button-notes").addEventListener("click", () => {
+      if (typeof window.refreshNotesTab === "function") {
+        window.refreshNotesTab();
+      }
+    });
 
 
     document.querySelectorAll(".editable").forEach((el) => {
@@ -1444,7 +1426,9 @@
     );
     if (clickedBtn) clickedBtn.classList.add('active');
 
+    // Si onglet NOTES : ajouter bouton PDF + rafraîchir les catégories
     if (tabName === "notes") {
+      // Ajouter bouton PDF si non présent
       if (!document.getElementById("exportPdfBtn")) {
         const btn = document.createElement("button");
         btn.id = "exportPdfBtn";
@@ -1453,8 +1437,14 @@
         btn.onclick = exportNotesToPdf;
         document.getElementById("tab-notes").prepend(btn);
       }
+
+      // Appeler refreshNotesTab() si elle est définie
+      if (typeof window.refreshNotesTab === "function") {
+        window.refreshNotesTab();
+      }
     }
   }
+
 
   document.addEventListener("click", function (e) {
     if (e.target.classList.contains("show-full-note")) {
