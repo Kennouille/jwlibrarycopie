@@ -1247,14 +1247,6 @@
       `;
     }
 
-
-    document.getElementById("tab-button-notes").addEventListener("click", () => {
-      if (typeof window.refreshNotesTab === "function") {
-        window.refreshNotesTab();
-      }
-    });
-
-
     document.querySelectorAll(".editable").forEach((el) => {
       el.addEventListener("input", (e) => {
         const { table, file, index, field } = e.target.dataset;
