@@ -748,7 +748,6 @@ def merge_notes(merged_db_path, db1_path, db2_path, location_id_map, usermark_gu
              last_modified, created, block_type, block_identifier) = row
 
             source_key = "file1" if os.path.normpath(source_db) == os.path.normpath(db1_path) else "file2"
-
             title = edited.get(source_key, {}).get("Title", title)
             content = edited.get(source_key, {}).get("Content", content)
 
@@ -763,18 +762,13 @@ def merge_notes(merged_db_path, db1_path, db2_path, location_id_map, usermark_gu
 
             cursor.execute("SELECT NoteId, Title, Content FROM Note WHERE Guid = ?", (guid,))
             existing = cursor.fetchone()
-
             if existing:
                 existing_note_id, existing_title, existing_content = existing
                 if existing_title == title and existing_content == content:
-                    print(f"Note guid={guid} déjà présente et identique (source: {source_db}), aucune action.")
                     note_mapping[(source_db, old_note_id)] = existing_note_id
                     continue
                 else:
-                    new_guid = str(uuid.uuid4())
-                    print(f"Conflit pour Note guid={guid} (source: {source_db}). "
-                          f"Insertion d'une nouvelle note avec nouveau GUID {new_guid}.")
-                    guid_to_insert = new_guid
+                    guid_to_insert = str(uuid.uuid4())
             else:
                 guid_to_insert = guid
 
@@ -796,29 +790,24 @@ def merge_notes(merged_db_path, db1_path, db2_path, location_id_map, usermark_gu
             ))
             new_note_id = cursor.lastrowid
 
-            # 🔁 Ajout des catégories sélectionnées
+            # 🔁 Gestion des tags choisis
             if isinstance(choice_data, dict):
                 selected_tags = choice_data.get("selectedTags", [])
                 if isinstance(selected_tags, list):
-                    for old_tag_id in selected_tags:
-                        if not isinstance(old_tag_id, int):
-                            continue
-                        new_tag_id = tag_id_map.get((source_db, old_tag_id))
-                        if new_tag_id:
-                            cursor.execute("""
-                                SELECT 1 FROM TagMap WHERE NoteId = ? AND TagId = ?
-                            """, (new_note_id, new_tag_id))
-                            if not cursor.fetchone():
-                                # Trouver la première position disponible pour ce TagId
-                                cursor.execute("""
-                                    SELECT COALESCE(MAX(Position), 0) + 1 FROM TagMap WHERE TagId = ?
-                                """, (tag_id,))
-                                position = cursor.fetchone()[0]
+                    translated_tags = []
+                    for tag_id in selected_tags:
+                        mapped = tag_id_map.get((source_db, tag_id))
+                        if mapped:
+                            translated_tags.append(mapped)
 
-                                cursor.execute("""
-                                    INSERT INTO TagMap (NoteId, TagId, Position)
-                                    VALUES (?, ?, ?)
-                                """, (new_note_id, tag_id, position))
+                    for tag_id in translated_tags:
+                        cursor.execute("SELECT COALESCE(MAX(Position), 0) + 1 FROM TagMap WHERE TagId = ?", (tag_id,))
+                        position = cursor.fetchone()[0]
+
+                        cursor.execute("""
+                            INSERT INTO TagMap (NoteId, TagId, Position)
+                            VALUES (?, ?, ?)
+                        """, (new_note_id, tag_id, position))
 
             note_mapping[(source_db, old_note_id)] = new_note_id
             inserted += 1
