@@ -1670,9 +1670,12 @@
               selectedTagIds.push(tagId);
             }
           });
+
+          // 🛡️ Ajoute cette ligne de sécurité :
+          if (!choices[table][index]) choices[table][index] = {};
+
           choices[table][index].selectedTags = selectedTagIds;
         }
-
 
         const editedFile1 = previewDataEdited[table]?.file1?.[index] || {};
         const editedFile2 = previewDataEdited[table]?.file2?.[index] || {};
