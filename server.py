@@ -2268,13 +2268,17 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
                 if not new_tag_id:
                     continue
 
-                cursor.execute("SELECT COALESCE(MAX(Position), 0) + 1 FROM TagMap WHERE TagId = ?", (new_tag_id,))
-                position = cursor.fetchone()[0]
-
                 cursor.execute("""
-                    INSERT INTO TagMap (NoteId, TagId, Position)
-                    VALUES (?, ?, ?)
-                """, (new_note_id, new_tag_id, position))
+                    SELECT 1 FROM TagMap WHERE NoteId = ? AND TagId = ?
+                """, (new_note_id, new_tag_id))
+                if not cursor.fetchone():
+                    cursor.execute("SELECT COALESCE(MAX(Position), 0) + 1 FROM TagMap WHERE TagId = ?", (new_tag_id,))
+                    position = cursor.fetchone()[0]
+
+                    cursor.execute("""
+                        INSERT INTO TagMap (NoteId, TagId, Position)
+                        VALUES (?, ?, ?)
+                    """, (new_note_id, new_tag_id, position))
 
         conn.commit()
 
