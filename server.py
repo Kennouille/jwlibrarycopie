@@ -801,13 +801,16 @@ def merge_notes(merged_db_path, db1_path, db2_path, location_id_map, usermark_gu
                             translated_tags.append(mapped)
 
                     for tag_id in translated_tags:
-                        cursor.execute("SELECT COALESCE(MAX(Position), 0) + 1 FROM TagMap WHERE TagId = ?", (tag_id,))
-                        position = cursor.fetchone()[0]
-
                         cursor.execute("""
-                            INSERT INTO TagMap (NoteId, TagId, Position)
-                            VALUES (?, ?, ?)
-                        """, (new_note_id, tag_id, position))
+                            SELECT 1 FROM TagMap WHERE NoteId = ? AND TagId = ?
+                        """, (new_note_id, tag_id))
+                        if not cursor.fetchone():
+                            cursor.execute("""
+                                INSERT INTO TagMap (NoteId, TagId, Position)
+                                VALUES (?, ?, (
+                                    SELECT COALESCE(MAX(Position), 0) + 1 FROM TagMap WHERE TagId = ?
+                                ))
+                            """, (new_note_id, tag_id, tag_id))
 
             note_mapping[(source_db, old_note_id)] = new_note_id
             inserted += 1
