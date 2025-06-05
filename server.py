@@ -2242,9 +2242,7 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
             if choice == "ignore":
                 continue
 
-            new_note_id = None
-            source_used = None
-
+            # Trouver la source correspondante à l'ancienne note
             for source_db in [db1_path, db2_path]:
                 source_key = "file1" if os.path.normpath(source_db) == os.path.normpath(db1_path) else "file2"
                 note = note_data.get("edited", {}).get(source_key)
@@ -2253,25 +2251,18 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
 
                 old_note_id = note.get("NoteId")
                 new_note_id = note_mapping.get((source_db, old_note_id))
-                if new_note_id:
-                    source_used = source_db
-                    break
-
-            if not new_note_id:
-                continue
-
-            # 🧹 Supprimer tous les anciens TagMap de cette note
-            cursor.execute("DELETE FROM TagMap WHERE NoteId = ?", (new_note_id,))
-
-            for tag_id in selected_tags:
-                new_tag_id = tag_id_map.get((source_used, tag_id))
-                if not new_tag_id:
+                if not new_note_id:
                     continue
 
-                cursor.execute("""
-                    SELECT 1 FROM TagMap WHERE NoteId = ? AND TagId = ?
-                """, (new_note_id, new_tag_id))
-                if not cursor.fetchone():
+                # 🔥 Supprimer tous les anciens TagMap pour cette note
+                cursor.execute("DELETE FROM TagMap WHERE NoteId = ?", (new_note_id,))
+
+                # 🧩 Réinsérer les nouveaux tags (évitera les doublons)
+                for tag_id in selected_tags:
+                    new_tag_id = tag_id_map.get((source_db, tag_id))
+                    if not new_tag_id:
+                        continue
+
                     cursor.execute("SELECT COALESCE(MAX(Position), 0) + 1 FROM TagMap WHERE TagId = ?", (new_tag_id,))
                     position = cursor.fetchone()[0]
 
@@ -2279,6 +2270,9 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
                         INSERT INTO TagMap (NoteId, TagId, Position)
                         VALUES (?, ?, ?)
                     """, (new_note_id, new_tag_id, position))
+
+                # Une fois qu’on a traité une source valide, on sort
+                break
 
         conn.commit()
 
