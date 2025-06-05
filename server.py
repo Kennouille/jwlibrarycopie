@@ -790,28 +790,6 @@ def merge_notes(merged_db_path, db1_path, db2_path, location_id_map, usermark_gu
             ))
             new_note_id = cursor.lastrowid
 
-            # 🔁 Gestion des tags choisis
-            if isinstance(choice_data, dict):
-                selected_tags = choice_data.get("selectedTags", [])
-                if isinstance(selected_tags, list):
-                    translated_tags = []
-                    for tag_id in selected_tags:
-                        mapped = tag_id_map.get((source_db, tag_id))
-                        if mapped:
-                            translated_tags.append(mapped)
-
-                    for tag_id in translated_tags:
-                        cursor.execute("""
-                            SELECT 1 FROM TagMap WHERE NoteId = ? AND TagId = ?
-                        """, (new_note_id, tag_id))
-                        if not cursor.fetchone():
-                            cursor.execute("""
-                                INSERT INTO TagMap (NoteId, TagId, Position)
-                                VALUES (?, ?, (
-                                    SELECT COALESCE(MAX(Position), 0) + 1 FROM TagMap WHERE TagId = ?
-                                ))
-                            """, (new_note_id, tag_id, tag_id))
-
             note_mapping[(source_db, old_note_id)] = new_note_id
             inserted += 1
 
