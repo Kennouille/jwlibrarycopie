@@ -2270,7 +2270,9 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
                 cursor.execute("DELETE FROM TagMap WHERE NoteId = ?", (new_note_id,))
 
                 # 🧩 Réinsérer les nouveaux tags avec position
-                for tag_id in selected_tags:
+                unique_selected_tags = list(set(selected_tags))  # ✅ supprime les doublons
+
+                for tag_id in unique_selected_tags:
                     new_tag_id = tag_id_map.get((source_db, tag_id))
                     if not new_tag_id:
                         continue
