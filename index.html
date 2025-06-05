@@ -549,11 +549,12 @@
       margin-top: 50px;
     }
 
-    select.category-select {
+    select.note-tags-select {
       background-color: white;
       position: relative;
       z-index: 10;
     }
+
 
 
 
@@ -1057,7 +1058,7 @@
                 return `<option value="${cat.TagId}" ${selected}>${cat.Name}</option>`;
               })
             ).join("");
-          return `<select class="category-select"
+          return `<select class="note-tags-select"
                           data-table="${table}" data-file="${fileKey}" data-index="${index}" data-cat-index="${i}"
                           style="width:100%; margin-top:4px;">${options}</select>`;
         }).join("")}
@@ -1448,10 +1449,10 @@
   });
 
   // ──────────────────────────────────────────────────────────────────────────────
-  // ÉCOUTEUR POUR LE MENU DEROULANT DE CATÉGORIE (class="category-select")
+  // ÉCOUTEUR POUR LE MENU DEROULANT DE CATÉGORIE (class="note-tags-select")
   // ──────────────────────────────────────────────────────────────────────────────
   document.addEventListener("change", function (e) {
-    if (!e.target.classList.contains("category-select")) return;
+    if (!e.target.classList.contains("note-tags-select")) return;
 
     const table   = e.target.dataset.table;   // "notes"
     const fileKey = e.target.dataset.file;    // "file1" ou "file2"
@@ -1639,6 +1640,18 @@
         const index = select.dataset.index;
         const value = select.value;
         if (!choices[table]) choices[table] = {};
+        if (table === "notes") {
+          const selectedTagIds = [];
+          const tagSelects = document.querySelectorAll(`.note-tags-select[data-index="${index}"]`);
+          tagSelects.forEach(tagSelect => {
+            const tagId = parseInt(tagSelect.value);
+            if (!isNaN(tagId)) {
+              selectedTagIds.push(tagId);
+            }
+          });
+          choices[table][index].selectedTags = selectedTagIds;
+        }
+
 
         const editedFile1 = previewDataEdited[table]?.file1?.[index] || {};
         const editedFile2 = previewDataEdited[table]?.file2?.[index] || {};

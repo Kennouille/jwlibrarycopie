@@ -798,6 +798,22 @@ def merge_notes(merged_db_path, db1_path, db2_path, location_id_map, usermark_gu
                 block_identifier
             ))
             new_note_id = cursor.lastrowid
+            # 🔁 Si des catégories ont été sélectionnées pour cette note
+            if isinstance(choice_data, dict):
+                selected_tags = choice_data.get("selectedTags", [])
+                if isinstance(selected_tags, list):
+                    for tag_id in selected_tags:
+                        if isinstance(tag_id, int) and tag_id > 0:
+                            cursor.execute("""
+                                SELECT 1 FROM TagMap WHERE NoteId = ? AND TagId = ?
+                            """, (new_note_id, tag_id))
+                            exists = cursor.fetchone()
+                            if not exists:
+                                cursor.execute("""
+                                    INSERT INTO TagMap (NoteId, TagId)
+                                    VALUES (?, ?)
+                                """, (new_note_id, tag_id))
+
             note_mapping[(source_db, old_note_id)] = new_note_id
             inserted += 1
 
