@@ -2235,51 +2235,55 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
                 continue
 
             selected_tags = note_data.get("selectedTags", [])
-            if not isinstance(selected_tags, list):
+            if not isinstance(selected_tags, list) or not selected_tags:
                 continue
 
             choice = note_data.get("choice")
             if choice == "ignore":
                 continue
 
-            # Trouver la source correspondante à l'ancienne note
             for source_db in [db1_path, db2_path]:
                 source_key = "file1" if os.path.normpath(source_db) == os.path.normpath(db1_path) else "file2"
+
+                # 🔍 Trouver l'ancien NoteId
                 note = note_data.get("edited", {}).get(source_key)
-                if not note:
+                old_note_id = None
+
+                if note and isinstance(note, dict):
+                    old_note_id = note.get("NoteId")
+                else:
+                    old_note_id = (
+                        note_data.get("noteId") or
+                        note_data.get(source_key, {}).get("NoteId")
+                    )
+
+                if not old_note_id:
                     continue
 
-                old_note_id = note.get("NoteId")
                 new_note_id = note_mapping.get((source_db, old_note_id))
                 if not new_note_id:
                     continue
 
+                print(f"[🧪] Appliquer tags sur NoteId={new_note_id}, venant de {source_key}")
+
                 # 🔥 Supprimer tous les anciens TagMap pour cette note
                 cursor.execute("DELETE FROM TagMap WHERE NoteId = ?", (new_note_id,))
 
-                # 🧩 Réinsérer les nouveaux tags (évitera les doublons)
+                # 🧩 Réinsérer les nouveaux tags avec position
                 for tag_id in selected_tags:
                     new_tag_id = tag_id_map.get((source_db, tag_id))
                     if not new_tag_id:
                         continue
 
+                    cursor.execute("SELECT COALESCE(MAX(Position), 0) + 1 FROM TagMap WHERE TagId = ?", (new_tag_id,))
+                    position = cursor.fetchone()[0]
+
                     cursor.execute("""
-                        SELECT 1 FROM TagMap WHERE NoteId = ? AND TagId = ?
-                    """, (new_note_id, new_tag_id))
-                    exists = cursor.fetchone()
+                        INSERT INTO TagMap (NoteId, TagId, Position)
+                        VALUES (?, ?, ?)
+                    """, (new_note_id, new_tag_id, position))
 
-                    if not exists:
-                        cursor.execute("SELECT COALESCE(MAX(Position), 0) + 1 FROM TagMap WHERE TagId = ?",
-                                       (new_tag_id,))
-                        position = cursor.fetchone()[0]
-
-                        cursor.execute("""
-                            INSERT INTO TagMap (NoteId, TagId, Position)
-                            VALUES (?, ?, ?)
-                        """, (new_note_id, new_tag_id, position))
-
-                # Une fois qu’on a traité une source valide, on sort
-                break
+                break  # ✅ On applique à une seule source valide, pas besoin de continuer
 
         conn.commit()
 
