@@ -745,6 +745,8 @@
   const supabase = createClient("https://mngggybayjooqkzbhvqy.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1uZ2dneWJheWpvb3FremJodnF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjY2MTU3NDgsImV4cCI6MjA0MjE5MTc0OH0.lnOqnq1AwN41g4xJ5O9oNIPBQqXYJkSrRhJ3osXtcsk");
 
   const BASE_URL = "https://web-production-0d059.up.railway.app/";
+  const currentTagSelections = {}; // { "index": [3, 5, 7], ... }
+
   let currentProgress = 0;
 
    async function updateProgress(targetPercent, message, step) {
@@ -1050,7 +1052,9 @@
         <br><br>
         <label>Catégories :</label><br>
         ${[0, 1, 2, 3, 4].map(i => {
-          const selectedId = String(tagIds[i] || "");
+          const currentSelectedTags = currentTagSelections[index] || tagIds;
+          const selectedId = String(currentSelectedTags[i] || "");
+
           const options = [`<option value="">Aucune catégorie</option>`]
             .concat(
               (previewDataEdited.tags[fileKey] || []).map(cat => {
@@ -1148,6 +1152,19 @@
       const fieldsToKeep = ["Title", "Content"];
       const maxLength = Math.max(contents.file1.length, contents.file2.length);
       const tabEl = document.getElementById("tab-notes");
+
+      // Sauvegarder les tags sélectionnés avant de reconstruire
+      document.querySelectorAll(".note-tags-select").forEach(select => {
+        const index = select.dataset.index;
+        if (!currentTagSelections[index]) currentTagSelections[index] = [];
+        const tagId = parseInt(select.value);
+        if (!isNaN(tagId)) {
+          if (!currentTagSelections[index].includes(tagId)) {
+            currentTagSelections[index].push(tagId);
+          }
+        }
+      });
+
 
       tabEl.innerHTML = `
         <table style="width: 100%; border-collapse: collapse;">
