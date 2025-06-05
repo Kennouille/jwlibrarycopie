@@ -2260,6 +2260,53 @@ def merge_platform_metadata(merged_db_path, db1_path, db2_path):
                 cursor.execute("INSERT INTO grdb_migrations (identifier) VALUES (?)", (ident,))
 
 
+def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_mapping, tag_id_map):
+    print("\n[🔁 APPLICATION DES selectedTags]")
+
+    with sqlite3.connect(merged_db_path) as conn:
+        cursor = conn.cursor()
+
+        for index_str, note_data in note_choices.items():
+            if not isinstance(note_data, dict):
+                continue
+
+            selected_tags = note_data.get("selectedTags", [])
+            if not isinstance(selected_tags, list):
+                continue
+
+            choice = note_data.get("choice")
+            if choice == "ignore":
+                continue
+
+            for source_db in [db1_path, db2_path]:
+                source_key = "file1" if os.path.normpath(source_db) == os.path.normpath(db1_path) else "file2"
+                note = note_data.get("edited", {}).get(source_key)
+                if not note:
+                    continue
+
+                old_note_id = note.get("NoteId")
+                new_note_id = note_mapping.get((source_db, old_note_id))
+                if not new_note_id:
+                    continue
+
+                for tag_id in selected_tags:
+                    new_tag_id = tag_id_map.get((source_db, tag_id))
+                    if not new_tag_id:
+                        continue
+
+                    cursor.execute("""
+                        SELECT 1 FROM TagMap WHERE NoteId = ? AND TagId = ?
+                    """, (new_note_id, new_tag_id))
+                    if not cursor.fetchone():
+                        cursor.execute("""
+                            INSERT INTO TagMap (NoteId, TagId)
+                            VALUES (?, ?)
+                        """, (new_note_id, new_tag_id))
+
+        conn.commit()
+    print("✅ selectedTags appliqués correctement aux notes.")
+
+
 @app.route('/merge', methods=['POST'])
 def merge_data():
     start_time = time.time()
@@ -2566,6 +2613,16 @@ def merge_data():
                 location_id_map,
                 item_id_map,
                 payload.get("choices", {}).get("tags", {})  # <-- choix utilisateur tags
+            )
+
+            # Appliquer les catégories sélectionnées manuellement sur les notes fusionnées
+            apply_selected_tags(
+                merged_db_path,
+                file1_db,
+                file2_db,
+                payload.get("choices", {}).get("notes", {}),
+                note_mapping,
+                tag_id_map
             )
 
             print(f"Tag ID Map: {tag_id_map}")
