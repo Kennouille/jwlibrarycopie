@@ -1707,7 +1707,6 @@
         throw new Error("Erreur backend : " + errorText);
       }
 
-
       const result = await response.json();
       if (result.merge_status !== "done") {
         throw new Error("La fusion n’a pas été finalisée correctement.");
