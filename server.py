@@ -2242,7 +2242,6 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
             if choice == "ignore":
                 continue
 
-            # Trouver la source correspondante à l'ancienne note
             for source_db in [db1_path, db2_path]:
                 source_key = "file1" if os.path.normpath(source_db) == os.path.normpath(db1_path) else "file2"
                 note = note_data.get("edited", {}).get(source_key)
@@ -2254,10 +2253,6 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
                 if not new_note_id:
                     continue
 
-                # 🔥 Supprimer tous les anciens TagMap pour cette note
-                cursor.execute("DELETE FROM TagMap WHERE NoteId = ?", (new_note_id,))
-
-                # 🧩 Réinsérer les nouveaux tags (évitera les doublons)
                 for tag_id in selected_tags:
                     new_tag_id = tag_id_map.get((source_db, tag_id))
                     if not new_tag_id:
@@ -2266,9 +2261,7 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
                     cursor.execute("""
                         SELECT 1 FROM TagMap WHERE NoteId = ? AND TagId = ?
                     """, (new_note_id, new_tag_id))
-                    exists = cursor.fetchone()
-
-                    if not exists:
+                    if not cursor.fetchone():
                         cursor.execute("SELECT COALESCE(MAX(Position), 0) + 1 FROM TagMap WHERE TagId = ?",
                                        (new_tag_id,))
                         position = cursor.fetchone()[0]
@@ -2278,11 +2271,7 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
                             VALUES (?, ?, ?)
                         """, (new_note_id, new_tag_id, position))
 
-                # Une fois qu’on a traité une source valide, on sort
-                break
-
         conn.commit()
-
     print("✅ selectedTags appliqués correctement aux notes.")
 
 
