@@ -695,7 +695,7 @@ def merge_bookmarks(merged_db_path, file1_db, file2_db, location_id_map, bookmar
     return mapping
 
 
-def merge_notes(merged_db_path, db1_path, db2_path, location_id_map, usermark_guid_map, note_choices):
+def merge_notes(merged_db_path, db1_path, db2_path, location_id_map, usermark_guid_map, note_choices, tag_id_map):
     print("\n=== FUSION DES NOTES AVEC CHOIX UTILISATEUR ===")
     inserted = 0
     note_mapping = {}
@@ -747,10 +747,7 @@ def merge_notes(merged_db_path, db1_path, db2_path, location_id_map, usermark_gu
             (old_note_id, guid, usermark_guid, location_id, title, content,
              last_modified, created, block_type, block_identifier) = row
 
-            # Appliquer édition utilisateur selon source
             source_key = "file1" if os.path.normpath(source_db) == os.path.normpath(db1_path) else "file2"
-            print(f"[DEBUG] source_key = {source_key}")
-            print(f"[DEBUG] edited = {edited}")
 
             title = edited.get(source_key, {}).get("Title", title)
             content = edited.get(source_key, {}).get("Content", content)
@@ -798,33 +795,24 @@ def merge_notes(merged_db_path, db1_path, db2_path, location_id_map, usermark_gu
                 block_identifier
             ))
             new_note_id = cursor.lastrowid
-            # 🔁 Si des catégories ont été sélectionnées pour cette note
+
+            # 🔁 Ajout des catégories sélectionnées
             if isinstance(choice_data, dict):
                 selected_tags = choice_data.get("selectedTags", [])
                 if isinstance(selected_tags, list):
-                    translated_tags = []
-                    for tag_id in selected_tags:
-                        if isinstance(tag_id, int) and tag_id > 0:
+                    for old_tag_id in selected_tags:
+                        if not isinstance(old_tag_id, int):
+                            continue
+                        new_tag_id = tag_id_map.get((source_db, old_tag_id))
+                        if new_tag_id:
                             cursor.execute("""
-                                SELECT NewTagId FROM MergeMapping_Tag
-                                WHERE OldTagId = ? AND SourceDb IN (?, ?)
-                                ORDER BY SourceDb LIMIT 1
-                            """, (tag_id, file1_db, file2_db))
-                            res = cursor.fetchone()
-                            if res:
-                                translated_tags.append(res[0])
-                            else:
-                                translated_tags.append(tag_id)  # fallback sans remap
-
-                    for tag_id in translated_tags:
-                        cursor.execute("""
-                            SELECT 1 FROM TagMap WHERE NoteId = ? AND TagId = ?
-                        """, (new_note_id, tag_id))
-                        if not cursor.fetchone():
-                            cursor.execute("""
-                                INSERT INTO TagMap (NoteId, TagId)
-                                VALUES (?, ?)
-                            """, (new_note_id, tag_id))
+                                SELECT 1 FROM TagMap WHERE NoteId = ? AND TagId = ?
+                            """, (new_note_id, new_tag_id))
+                            if not cursor.fetchone():
+                                cursor.execute("""
+                                    INSERT INTO TagMap (NoteId, TagId)
+                                    VALUES (?, ?)
+                                """, (new_note_id, new_tag_id))
 
             note_mapping[(source_db, old_note_id)] = new_note_id
             inserted += 1
@@ -2588,46 +2576,17 @@ def merge_data():
             usermark_guid_map[guid] = new_id
         conn.close()
 
-        try:
-            note_mapping = merge_notes(
-                merged_db_path,
-                file1_db,
-                file2_db,
-                location_id_map,
-                usermark_guid_map,
-                payload.get("choices", {}).get("notes", {})  # <-- nouveau paramètre
-            )
-        except Exception as e:
-            import traceback
-            print(f"❌ Erreur dans merge_notes : {e}")
-            traceback.print_exc()
-            raise
-
-        # --- Étape suivante : fusion des Tags et TagMap ---
+        # --- Étape 1 : Fusion des Tags et TagMap (pour obtenir tag_id_map) ---
         try:
             tag_id_map, tagmap_id_map = merge_tags_and_tagmap(
                 merged_db_path,
                 file1_db,
                 file2_db,
-                note_mapping,
+                {},  # note_mapping vide car pas encore connu
                 location_id_map,
                 item_id_map,
-                payload.get("choices", {}).get("tags", {})  # <-- choix utilisateur tags
+                payload.get("choices", {}).get("tags", {})
             )
-
-            # Appliquer les catégories sélectionnées manuellement sur les notes fusionnées
-            apply_selected_tags(
-                merged_db_path,
-                file1_db,
-                file2_db,
-                payload.get("choices", {}).get("notes", {}),
-                note_mapping,
-                tag_id_map
-            )
-
-            print(f"Tag ID Map: {tag_id_map}")
-            print(f"TagMap ID Map: {tagmap_id_map}")
-
         except Exception as e:
             import traceback
             print("❌ Échec de merge_tags_and_tagmap (mais on continue le merge global) :")
@@ -2635,8 +2594,36 @@ def merge_data():
             traceback.print_exc()
             tag_id_map, tagmap_id_map = {}, {}
 
-        # --- Vérification Tag ---
-        print("\n=== TAGS VERIFICATION ===")
+        # --- Étape 2 : Fusion des Notes avec les nouveaux TagIds ---
+        try:
+            note_mapping = merge_notes(
+                merged_db_path,
+                file1_db,
+                file2_db,
+                location_id_map,
+                usermark_guid_map,
+                payload.get("choices", {}).get("notes", {}),
+                tag_id_map  # ✅ ici maintenant
+            )
+        except Exception as e:
+            import traceback
+            print(f"❌ Erreur dans merge_notes : {e}")
+            traceback.print_exc()
+            raise
+
+        # --- Étape 3 : Réappliquer les catégories manuelles sélectionnées ---
+        apply_selected_tags(
+            merged_db_path,
+            file1_db,
+            file2_db,
+            payload.get("choices", {}).get("notes", {}),
+            note_mapping,
+            tag_id_map
+        )
+
+        # --- Debug facultatif ---
+        print(f"Tag ID Map: {tag_id_map}")
+        print(f"TagMap ID Map: {tagmap_id_map}")
 
         try:
             with sqlite3.connect(merged_db_path) as conn:
