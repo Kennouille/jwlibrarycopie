@@ -1660,7 +1660,22 @@
         const table = select.dataset.table;
         const index = select.dataset.index;
         const value = select.value;
+
         if (!choices[table]) choices[table] = {};
+        if (!choices[table][index]) choices[table][index] = {};
+
+        // 📌 Ajoute le choix
+        choices[table][index].choice = value;
+
+        // 📌 Ajoute les éditions (si disponibles)
+        const editedFile1 = previewDataEdited[table]?.file1?.[index] || {};
+        const editedFile2 = previewDataEdited[table]?.file2?.[index] || {};
+        choices[table][index].edited = {
+          file1: editedFile1,
+          file2: editedFile2
+        };
+
+        // 📌 Ajoute les catégories sélectionnées uniquement pour les notes
         if (table === "notes") {
           const selectedTagIds = [];
           const tagSelects = document.querySelectorAll(`.note-tags-select[data-index="${index}"]`);
@@ -1670,23 +1685,8 @@
               selectedTagIds.push(tagId);
             }
           });
-
-          // 🛡️ Ajoute cette ligne de sécurité :
-          if (!choices[table][index]) choices[table][index] = {};
-
           choices[table][index].selectedTags = selectedTagIds;
         }
-
-        const editedFile1 = previewDataEdited[table]?.file1?.[index] || {};
-        const editedFile2 = previewDataEdited[table]?.file2?.[index] || {};
-
-        choices[table][index] = {
-          choice: value,
-          edited: {
-            file1: editedFile1,
-            file2: editedFile2
-          }
-        };
       });
 
       const response = await fetch(`${BASE_URL}/merge`, {
@@ -1700,6 +1700,7 @@
           choices: choices
         })
       });
+
 
       if (!response.ok) {
         const errorText = await response.text();
