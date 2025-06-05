@@ -1489,160 +1489,158 @@ def compare_data():
 def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, location_id_map, item_id_map, tag_choices):
     print("\n[FUSION TAGS ET TAGMAP - AVEC CHOIX UTILISATEUR]")
 
-    conn = sqlite3.connect(merged_db_path)
-    cursor = conn.cursor()
+    with sqlite3.connect(merged_db_path, timeout=15) as conn:
+        conn.execute("PRAGMA journal_mode = DELETE")
+        cursor = conn.cursor()
 
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS MergeMapping_Tag (
-            SourceDb TEXT,
-            OldTagId INTEGER,
-            NewTagId INTEGER,
-            PRIMARY KEY (SourceDb, OldTagId)
-        )
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS MergeMapping_TagMap (
-            SourceDb TEXT,
-            OldTagMapId INTEGER,
-            NewTagMapId INTEGER,
-            PRIMARY KEY (SourceDb, OldTagMapId)
-        )
-    """)
-    conn.commit()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS MergeMapping_Tag (
+                SourceDb TEXT,
+                OldTagId INTEGER,
+                NewTagId INTEGER,
+                PRIMARY KEY (SourceDb, OldTagId)
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS MergeMapping_TagMap (
+                SourceDb TEXT,
+                OldTagMapId INTEGER,
+                NewTagMapId INTEGER,
+                PRIMARY KEY (SourceDb, OldTagMapId)
+            )
+        """)
+        conn.commit()
 
-    cursor.execute("SELECT COALESCE(MAX(TagId), 0) FROM Tag")
-    max_tag_id = cursor.fetchone()[0]
-    tag_id_map = {}
+        cursor.execute("SELECT COALESCE(MAX(TagId), 0) FROM Tag")
+        max_tag_id = cursor.fetchone()[0]
+        tag_id_map = {}
 
-    def fetch_tags(db_path):
-        with sqlite3.connect(db_path) as conn:
-            cur = conn.cursor()
-            cur.execute("SELECT TagId, Type, Name FROM Tag")
-            return cur.fetchall()
+        def fetch_tags(db_path):
+            with sqlite3.connect(db_path) as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT TagId, Type, Name FROM Tag")
+                return cur.fetchall()
 
-    tags1 = fetch_tags(file1_db)
-    tags2 = fetch_tags(file2_db)
+        tags1 = fetch_tags(file1_db)
+        tags2 = fetch_tags(file2_db)
 
-    max_len = max(len(tags1), len(tags2))
-    for index in range(max_len):
-        tag1 = tags1[index] if index < len(tags1) else None
-        tag2 = tags2[index] if index < len(tags2) else None
+        max_len = max(len(tags1), len(tags2))
+        for index in range(max_len):
+            tag1 = tags1[index] if index < len(tags1) else None
+            tag2 = tags2[index] if index < len(tags2) else None
 
-        choice_data = tag_choices.get(str(index), "file1")
-        if isinstance(choice_data, str):
-            choice = choice_data
-            edited = {}
-        else:
-            choice = choice_data.get("choice", "file1")
-            edited = choice_data.get("edited", {})
+            choice_data = tag_choices.get(str(index), "file1")
+            if isinstance(choice_data, str):
+                choice = choice_data
+                edited = {}
+            else:
+                choice = choice_data.get("choice", "file1")
+                edited = choice_data.get("edited", {})
 
-        to_insert = []
-        if choice == "file1" and tag1:
-            to_insert = [(tag1, file1_db)]
-        elif choice == "file2" and tag2:
-            to_insert = [(tag2, file2_db)]
-        elif choice == "both":
-            if tag1:
-                to_insert.append((tag1, file1_db))
-            if tag2:
-                to_insert.append((tag2, file2_db))
-        elif choice == "ignore":
-            continue
-
-        for (tag_id, tag_type, tag_name), db_path in to_insert:
-            # ✅ Modification si utilisateur a édité
-            source_key = "file1" if os.path.normpath(db_path) == os.path.normpath(file1_db) else "file2"
-            tag_name = edited.get(source_key, {}).get("Name", tag_name)
-
-            cursor.execute("SELECT NewTagId FROM MergeMapping_Tag WHERE SourceDb = ? AND OldTagId = ?", (db_path, tag_id))
-            res = cursor.fetchone()
-            if res:
-                tag_id_map[(db_path, tag_id)] = res[0]
+            to_insert = []
+            if choice == "file1" and tag1:
+                to_insert = [(tag1, file1_db)]
+            elif choice == "file2" and tag2:
+                to_insert = [(tag2, file2_db)]
+            elif choice == "both":
+                if tag1:
+                    to_insert.append((tag1, file1_db))
+                if tag2:
+                    to_insert.append((tag2, file2_db))
+            elif choice == "ignore":
                 continue
 
-            cursor.execute("SELECT TagId FROM Tag WHERE Type = ? AND Name = ?", (tag_type, tag_name))
-            existing = cursor.fetchone()
-            if existing:
-                new_tag_id = existing[0]
-            else:
-                max_tag_id += 1
-                new_tag_id = max_tag_id
-                cursor.execute("INSERT INTO Tag (TagId, Type, Name) VALUES (?, ?, ?)", (new_tag_id, tag_type, tag_name))
+            for (tag_id, tag_type, tag_name), db_path in to_insert:
+                source_key = "file1" if os.path.normpath(db_path) == os.path.normpath(file1_db) else "file2"
+                tag_name = edited.get(source_key, {}).get("Name", tag_name)
 
-            tag_id_map[(db_path, tag_id)] = new_tag_id
-            cursor.execute("INSERT INTO MergeMapping_Tag (SourceDb, OldTagId, NewTagId) VALUES (?, ?, ?)", (db_path, tag_id, new_tag_id))
-
-    # TagMap inchangé
-    cursor.execute("SELECT COALESCE(MAX(TagMapId), 0) FROM TagMap")
-    max_tagmap_id = cursor.fetchone()[0]
-    tagmap_id_map = {}
-
-    for db_path in [file1_db, file2_db]:
-        with sqlite3.connect(db_path) as src_conn:
-            src_cursor = src_conn.cursor()
-            src_cursor.execute("SELECT TagMapId, PlaylistItemId, LocationId, NoteId, TagId, Position FROM TagMap")
-            rows = src_cursor.fetchall()
-
-            for old_tagmap_id, playlist_item_id, location_id, note_id, old_tag_id, position in rows:
-                new_tag_id = tag_id_map.get((db_path, old_tag_id))
-                if new_tag_id is None:
+                cursor.execute("SELECT NewTagId FROM MergeMapping_Tag WHERE SourceDb = ? AND OldTagId = ?", (db_path, tag_id))
+                res = cursor.fetchone()
+                if res:
+                    tag_id_map[(db_path, tag_id)] = res[0]
                     continue
 
-                new_note_id = note_mapping.get((db_path, note_id)) if note_id else None
-                new_location_id = location_id_map.get((db_path, location_id)) if location_id else None
-                new_playlist_item_id = item_id_map.get((db_path, playlist_item_id)) if playlist_item_id else None
+                cursor.execute("SELECT TagId FROM Tag WHERE Type = ? AND Name = ?", (tag_type, tag_name))
+                existing = cursor.fetchone()
+                if existing:
+                    new_tag_id = existing[0]
+                else:
+                    max_tag_id += 1
+                    new_tag_id = max_tag_id
+                    cursor.execute("INSERT INTO Tag (TagId, Type, Name) VALUES (?, ?, ?)", (new_tag_id, tag_type, tag_name))
 
-                non_null_refs = sum(x is not None for x in [new_note_id, new_location_id, new_playlist_item_id])
-                if non_null_refs != 1:
-                    continue
+                tag_id_map[(db_path, tag_id)] = new_tag_id
+                cursor.execute("INSERT INTO MergeMapping_Tag (SourceDb, OldTagId, NewTagId) VALUES (?, ?, ?)", (db_path, tag_id, new_tag_id))
 
-                cursor.execute("""
-                    SELECT TagMapId FROM TagMap
-                    WHERE TagId = ?
-                    AND IFNULL(PlaylistItemId, -1) = IFNULL(?, -1)
-                    AND IFNULL(LocationId, -1) = IFNULL(?, -1)
-                    AND IFNULL(NoteId, -1) = IFNULL(?, -1)
-                    AND Position = ?
-                """, (new_tag_id, new_playlist_item_id, new_location_id, new_note_id, position))
-                if cursor.fetchone():
-                    continue
+        # TagMap inchangé
+        cursor.execute("SELECT COALESCE(MAX(TagMapId), 0) FROM TagMap")
+        max_tagmap_id = cursor.fetchone()[0]
+        tagmap_id_map = {}
 
-                if new_location_id is not None:
-                    cursor.execute("""
-                        SELECT TagMapId FROM TagMap
-                        WHERE TagId = ? AND LocationId = ?
-                    """, (new_tag_id, new_location_id))
-                    existing = cursor.fetchone()
-                    if existing:
-                        tagmap_id_map[(db_path, old_tagmap_id)] = existing[0]
+        for db_path in [file1_db, file2_db]:
+            with sqlite3.connect(db_path) as src_conn:
+                src_cursor = src_conn.cursor()
+                src_cursor.execute("SELECT TagMapId, PlaylistItemId, LocationId, NoteId, TagId, Position FROM TagMap")
+                rows = src_cursor.fetchall()
+
+                for old_tagmap_id, playlist_item_id, location_id, note_id, old_tag_id, position in rows:
+                    new_tag_id = tag_id_map.get((db_path, old_tag_id))
+                    if new_tag_id is None:
                         continue
 
-                tentative = position
-                while True:
-                    cursor.execute("SELECT 1 FROM TagMap WHERE TagId = ? AND Position = ?", (new_tag_id, tentative))
-                    if not cursor.fetchone():
-                        break
-                    tentative += 1
+                    new_note_id = note_mapping.get((db_path, note_id)) if note_id else None
+                    new_location_id = location_id_map.get((db_path, location_id)) if location_id else None
+                    new_playlist_item_id = item_id_map.get((db_path, playlist_item_id)) if playlist_item_id else None
 
-                max_tagmap_id += 1
-                new_tagmap_id = max_tagmap_id
+                    non_null_refs = sum(x is not None for x in [new_note_id, new_location_id, new_playlist_item_id])
+                    if non_null_refs != 1:
+                        continue
 
-                cursor.execute("""
-                    INSERT INTO TagMap (TagMapId, PlaylistItemId, LocationId, NoteId, TagId, Position)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (new_tagmap_id, new_playlist_item_id, new_location_id, new_note_id, new_tag_id, tentative))
+                    cursor.execute("""
+                        SELECT TagMapId FROM TagMap
+                        WHERE TagId = ?
+                        AND IFNULL(PlaylistItemId, -1) = IFNULL(?, -1)
+                        AND IFNULL(LocationId, -1) = IFNULL(?, -1)
+                        AND IFNULL(NoteId, -1) = IFNULL(?, -1)
+                        AND Position = ?
+                    """, (new_tag_id, new_playlist_item_id, new_location_id, new_note_id, position))
+                    if cursor.fetchone():
+                        continue
 
-                cursor.execute("""
-                    INSERT INTO MergeMapping_TagMap (SourceDb, OldTagMapId, NewTagMapId)
-                    VALUES (?, ?, ?)
-                """, (db_path, old_tagmap_id, new_tagmap_id))
+                    if new_location_id is not None:
+                        cursor.execute("""
+                            SELECT TagMapId FROM TagMap
+                            WHERE TagId = ? AND LocationId = ?
+                        """, (new_tag_id, new_location_id))
+                        existing = cursor.fetchone()
+                        if existing:
+                            tagmap_id_map[(db_path, old_tagmap_id)] = existing[0]
+                            continue
 
-                tagmap_id_map[(db_path, old_tagmap_id)] = new_tagmap_id
+                    tentative = position
+                    while True:
+                        cursor.execute("SELECT 1 FROM TagMap WHERE TagId = ? AND Position = ?", (new_tag_id, tentative))
+                        if not cursor.fetchone():
+                            break
+                        tentative += 1
 
-    conn.commit()
-    conn.close()
-    print("✔ Fusion des Tags et TagMap terminée (avec choix utilisateur).")
-    return tag_id_map, tagmap_id_map
+                    max_tagmap_id += 1
+                    new_tagmap_id = max_tagmap_id
+
+                    cursor.execute("""
+                        INSERT INTO TagMap (TagMapId, PlaylistItemId, LocationId, NoteId, TagId, Position)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (new_tagmap_id, new_playlist_item_id, new_location_id, new_note_id, new_tag_id, tentative))
+
+                    cursor.execute("""
+                        INSERT INTO MergeMapping_TagMap (SourceDb, OldTagMapId, NewTagMapId)
+                        VALUES (?, ?, ?)
+                    """, (db_path, old_tagmap_id, new_tagmap_id))
+
+                    tagmap_id_map[(db_path, old_tagmap_id)] = new_tagmap_id
+
+        print("✔ Fusion des Tags et TagMap terminée (avec choix utilisateur).")
+        return tag_id_map, tagmap_id_map
 
 
 def merge_playlist_items(merged_db_path, file1_db, file2_db, im_mapping=None):
