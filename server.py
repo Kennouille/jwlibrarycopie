@@ -802,17 +802,29 @@ def merge_notes(merged_db_path, db1_path, db2_path, location_id_map, usermark_gu
             if isinstance(choice_data, dict):
                 selected_tags = choice_data.get("selectedTags", [])
                 if isinstance(selected_tags, list):
+                    translated_tags = []
                     for tag_id in selected_tags:
                         if isinstance(tag_id, int) and tag_id > 0:
                             cursor.execute("""
-                                SELECT 1 FROM TagMap WHERE NoteId = ? AND TagId = ?
+                                SELECT NewTagId FROM MergeMapping_Tag
+                                WHERE OldTagId = ? AND SourceDb IN (?, ?)
+                                ORDER BY SourceDb LIMIT 1
+                            """, (tag_id, file1_db, file2_db))
+                            res = cursor.fetchone()
+                            if res:
+                                translated_tags.append(res[0])
+                            else:
+                                translated_tags.append(tag_id)  # fallback sans remap
+
+                    for tag_id in translated_tags:
+                        cursor.execute("""
+                            SELECT 1 FROM TagMap WHERE NoteId = ? AND TagId = ?
+                        """, (new_note_id, tag_id))
+                        if not cursor.fetchone():
+                            cursor.execute("""
+                                INSERT INTO TagMap (NoteId, TagId)
+                                VALUES (?, ?)
                             """, (new_note_id, tag_id))
-                            exists = cursor.fetchone()
-                            if not exists:
-                                cursor.execute("""
-                                    INSERT INTO TagMap (NoteId, TagId)
-                                    VALUES (?, ?)
-                                """, (new_note_id, tag_id))
 
             note_mapping[(source_db, old_note_id)] = new_note_id
             inserted += 1
