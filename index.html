@@ -1701,7 +1701,6 @@
         })
       });
 
-
       if (!response.ok) {
         const errorText = await response.text();
         showError(errorText || translations[window.currentLang].errors.mergeFailed);
