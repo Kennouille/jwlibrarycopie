@@ -809,10 +809,16 @@ def merge_notes(merged_db_path, db1_path, db2_path, location_id_map, usermark_gu
                                 SELECT 1 FROM TagMap WHERE NoteId = ? AND TagId = ?
                             """, (new_note_id, new_tag_id))
                             if not cursor.fetchone():
+                                # Déterminer la prochaine position libre pour cette note
                                 cursor.execute("""
-                                    INSERT INTO TagMap (NoteId, TagId)
-                                    VALUES (?, ?)
-                                """, (new_note_id, new_tag_id))
+                                    SELECT COALESCE(MAX(Position), 0) + 1 FROM TagMap WHERE NoteId = ?
+                                """, (new_note_id,))
+                                position = cursor.fetchone()[0]
+
+                                cursor.execute("""
+                                    INSERT INTO TagMap (NoteId, TagId, Position)
+                                    VALUES (?, ?, ?)
+                                """, (new_note_id, new_tag_id, position))
 
             note_mapping[(source_db, old_note_id)] = new_note_id
             inserted += 1
