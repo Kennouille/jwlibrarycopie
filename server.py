@@ -2238,50 +2238,36 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
             if choice == "ignore":
                 continue
 
-            # Cas 1 : BOTH → on applique aux 2 notes
+            # 🔎 Récupérer les tags sélectionnés selon le choix
             if choice == "both":
                 selected_tags = note_data.get("selectedTags", [])
-                for source_key, source_db in [("file1", db1_path), ("file2", db2_path)]:
-                    old_note = note_data.get("edited", {}).get(source_key)
-                    if not old_note:
-                        continue
-
-                    old_note_id = old_note.get("NoteId")
-                    new_note_id = note_mapping.get((source_db, old_note_id))
-                    if not new_note_id:
-                        continue
-
-                    cursor.execute("DELETE FROM TagMap WHERE NoteId = ?", (new_note_id,))
-                    for tag_id in selected_tags:
-                        new_tag_id = tag_id_map.get((source_db, tag_id))
-                        if not new_tag_id:
-                            continue
-
-                        cursor.execute("SELECT COALESCE(MAX(Position), 0) + 1 FROM TagMap WHERE TagId = ?", (new_tag_id,))
-                        position = cursor.fetchone()[0]
-
-                        cursor.execute("""
-                            INSERT INTO TagMap (NoteId, TagId, Position)
-                            VALUES (?, ?, ?)
-                        """, (new_note_id, new_tag_id, position))
-
-            # Cas 2 : file1 ou file2 → on applique uniquement à une note
             else:
                 selected_tags = note_data.get("selectedTagsPerSource", {}).get(choice, [])
-                source_key = choice
-                source_db = db1_path if choice == "file1" else db2_path
 
-                old_note = note_data.get("edited", {}).get(source_key)
-                if not old_note:
+            if not isinstance(selected_tags, list):
+                continue
+
+            # 🔁 Appliquer sur les notes insérées depuis la bonne source
+            for source_db in [db1_path, db2_path]:
+                source_key = "file1" if os.path.normpath(source_db) == os.path.normpath(db1_path) else "file2"
+                note = note_data.get("edited", {}).get(source_key)
+                if not note:
                     continue
 
-                old_note_id = old_note.get("NoteId")
+                old_note_id = note.get("NoteId")
                 new_note_id = note_mapping.get((source_db, old_note_id))
                 if not new_note_id:
                     continue
 
+                print(f"[🧪] Appliquer tags sur NoteId={new_note_id} (index {index_str}), source: {source_key}")
+
+                # 🧹 Supprimer tous les anciens tags liés à cette note
                 cursor.execute("DELETE FROM TagMap WHERE NoteId = ?", (new_note_id,))
-                for tag_id in selected_tags:
+
+                # 🧩 Réinsérer les nouveaux tags (sans doublons)
+                unique_tags = list(set(selected_tags))
+
+                for tag_id in unique_tags:
                     new_tag_id = tag_id_map.get((source_db, tag_id))
                     if not new_tag_id:
                         continue
@@ -2294,8 +2280,9 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
                         VALUES (?, ?, ?)
                     """, (new_note_id, new_tag_id, position))
 
-        conn.commit()
+                break  # ✅ Appliqué à une seule source, on sort de la boucle
 
+        conn.commit()
     print("✅ selectedTags appliqués correctement aux notes.")
 
 
