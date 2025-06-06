@@ -2238,7 +2238,6 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
             if choice == "ignore":
                 continue
 
-            # 🔎 Récupérer les tags sélectionnés selon le choix
             if choice == "both":
                 selected_tags = note_data.get("selectedTags", [])
             else:
@@ -2247,9 +2246,11 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
             if not isinstance(selected_tags, list):
                 continue
 
-            # 🔁 Appliquer sur les notes insérées depuis la bonne source
             for source_db in [db1_path, db2_path]:
                 source_key = "file1" if os.path.normpath(source_db) == os.path.normpath(db1_path) else "file2"
+                if (choice == "file1" and source_key != "file1") or (choice == "file2" and source_key != "file2"):
+                    continue  # Ne traite que la bonne source
+
                 note = note_data.get("edited", {}).get(source_key)
                 if not note:
                     continue
@@ -2259,15 +2260,13 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
                 if not new_note_id:
                     continue
 
-                print(f"[🧪] Appliquer tags sur NoteId={new_note_id} (index {index_str}), source: {source_key}")
-
-                # 🧹 Supprimer tous les anciens tags liés à cette note
+                # 🔥 Supprimer tous les anciens TagMap
                 cursor.execute("DELETE FROM TagMap WHERE NoteId = ?", (new_note_id,))
 
-                # 🧩 Réinsérer les nouveaux tags (sans doublons)
-                unique_tags = list(set(selected_tags))
+                # ✅ Insérer les nouveaux tags
+                unique_selected_tags = list(set(selected_tags))  # éviter les doublons
 
-                for tag_id in unique_tags:
+                for tag_id in unique_selected_tags:
                     new_tag_id = tag_id_map.get((source_db, tag_id))
                     if not new_tag_id:
                         continue
@@ -2280,9 +2279,10 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
                         VALUES (?, ?, ?)
                     """, (new_note_id, new_tag_id, position))
 
-                break  # ✅ Appliqué à une seule source, on sort de la boucle
+                break  # ✅ Ne traite qu'une seule source correcte
 
         conn.commit()
+
     print("✅ selectedTags appliqués correctement aux notes.")
 
 
