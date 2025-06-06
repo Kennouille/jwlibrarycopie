@@ -1033,18 +1033,19 @@
   function renderEditableField(table, fileKey, index, field, value, labels) {
     const escaped = escapeHTML(value || '');
     const id = `editable-${table}-${fileKey}-${index}-${field}`;
+    const noteObj = previewDataEdited.notes[fileKey]?.[index] || {};
+    const noteId = noteObj.NoteId;
 
-    // Note : rendre le titre non modifiable
+    // 🔒 Le titre est en lecture seule
     if (table === "notes" && field === "Title") {
       return `<div><strong>${labels[field]} :</strong><br>
         <input type="text" value="${escaped}" style="width:100%;" readonly></div>`;
     }
 
+    // 📝 Zone de texte pour "Content" avec 5 menus de catégories
     if (table === "notes" && field === "Content") {
-      const noteObj = previewDataEdited.notes[fileKey]?.[index] || {};
       const tagIds = Array.isArray(noteObj.TagIds) ? noteObj.TagIds : [];
 
-      // Retourne le textarea + bouton + 3 dropdowns
       return `<div>
         <strong>${labels[field]} :</strong><br>
         <textarea class="editable" id="${id}" data-table="${table}" data-file="${fileKey}" data-index="${index}" data-field="${field}" rows="4" style="width:100%;">${escaped}</textarea>
@@ -1052,28 +1053,26 @@
         <br><br>
         <label>Catégories :</label><br>
         ${[0, 1, 2, 3, 4].map(i => {
-          const currentSelectedTags = currentTagSelections[index] || tagIds;
-          const selectedId = String(currentSelectedTags[i] || "");
+          const selectedId = String(tagIds[i] || "");
+          const options = [`<option value="">Aucune catégorie</option>`].concat(
+            (previewDataEdited.tags[fileKey] || []).map(cat => {
+              const selected = String(cat.TagId) === selectedId ? "selected" : "";
+              return `<option value="${cat.TagId}" ${selected}>${cat.Name}</option>`;
+            })
+          ).join("");
 
-          const options = [`<option value="">Aucune catégorie</option>`]
-            .concat(
-              (previewDataEdited.tags[fileKey] || []).map(cat => {
-                const selected = String(cat.TagId) === selectedId ? "selected" : "";
-                return `<option value="${cat.TagId}" ${selected}>${cat.Name}</option>`;
-              })
-            ).join("");
           return `<select class="note-tags-select"
-                          data-table="${table}" data-file="${fileKey}" data-index="${index}" data-cat-index="${i}"
+                          data-table="${table}" data-file="${fileKey}" data-index="${index}" data-noteid="${noteId}" data-cat-index="${i}"
                           style="width:100%; margin-top:4px;">${options}</select>`;
         }).join("")}
       </div>`;
     }
 
+    // 🔤 Champs standards (ex : Name)
     return `<div><strong>${labels[field]} :</strong><br>
       <input type="text" class="editable" id="${id}" data-table="${table}" data-file="${fileKey}" data-index="${index}" data-field="${field}" value="${escaped}" style="width:100%;">
     </div>`;
   }
-
 
   function loadPreviewData(previewData) {
     document.getElementById("preview-section").classList.remove("hidden");
@@ -1664,10 +1663,8 @@
         if (!choices[table]) choices[table] = {};
         if (!choices[table][index]) choices[table][index] = {};
 
-        // 📌 Ajoute le choix
         choices[table][index].choice = value;
 
-        // 📌 Ajoute les éditions (si disponibles)
         const editedFile1 = previewDataEdited[table]?.file1?.[index] || {};
         const editedFile2 = previewDataEdited[table]?.file2?.[index] || {};
         choices[table][index].edited = {
@@ -1675,25 +1672,28 @@
           file2: editedFile2
         };
 
-        // 📌 Ajoute les catégories sélectionnées uniquement pour les notes
         if (table === "notes") {
-          const selectedTagIds = [];
-          const tagSelects = document.querySelectorAll(`.note-tags-select[data-index="${index}"]`);
-          tagSelects.forEach(tagSelect => {
+          const selectedTagIdsFile1 = [];
+          const selectedTagIdsFile2 = [];
+
+          const tagSelectsFile1 = document.querySelectorAll(`.note-tags-select[data-index="${index}"][data-source="file1"]`);
+          tagSelectsFile1.forEach(tagSelect => {
             const tagId = parseInt(tagSelect.value);
-            if (!isNaN(tagId)) {
-              selectedTagIds.push(tagId);
-            }
+            if (!isNaN(tagId)) selectedTagIdsFile1.push(tagId);
           });
 
-          // Associer les tags à la bonne source
-          const choice = value;
-          if (choice === "file1" || choice === "file2") {
-            if (!choices[table][index].selectedTagsPerSource) choices[table][index].selectedTagsPerSource = {};
-            choices[table][index].selectedTagsPerSource[choice] = selectedTagIds;
+          const tagSelectsFile2 = document.querySelectorAll(`.note-tags-select[data-index="${index}"][data-source="file2"]`);
+          tagSelectsFile2.forEach(tagSelect => {
+            const tagId = parseInt(tagSelect.value);
+            if (!isNaN(tagId)) selectedTagIdsFile2.push(tagId);
+          });
+
+          if (value === "both") {
+            const merged = [...new Set([...selectedTagIdsFile1, ...selectedTagIdsFile2])];
+            choices[table][index].selectedTags = merged;
           } else {
-            // Pour 'both', on applique les tags à chaque source
-            choices[table][index].selectedTags = selectedTagIds;
+            if (!choices[table][index].selectedTagsPerSource) choices[table][index].selectedTagsPerSource = {};
+            choices[table][index].selectedTagsPerSource[value] = value === "file1" ? selectedTagIdsFile1 : selectedTagIdsFile2;
           }
         }
       });
@@ -1726,9 +1726,7 @@
 
       updateMergeSteps(4);
       await updateProgress(92, "Création du fichier ZIP final...", 5);
-
       await updateProgress(95, "Reconstruction du fichier .jwlibrary...", 5);
-      console.log("🚀 rebuildFinalZip() va être appelé");
 
       await rebuildFinalZip();
       trackMerge("success");
@@ -1743,12 +1741,10 @@
       step5.classList.add("completed");
 
       document.getElementById('merge-summary').classList.remove('hidden');
-      const summaryText = document.getElementById('summary-text');
-      summaryText.innerHTML =
+      document.getElementById('summary-text').innerHTML =
         `La fusion est terminée. Les données identiques (notes, surlignages, marques-pages, playlists, etc.) ont été conservées.
         Les éléments uniques de chaque fichier ont été ajoutés.<br><br>
         <strong>💡 Une fois le téléchargement automatique effectué, tous les fichiers sont immédiatement effacés. Si le téléchargement ne s'est pas bien passé, actualise la page et renouvelle l'opération en entier.</strong>`;
-
     } catch (error) {
       console.error("Erreur:", error);
       showError(error.message);
