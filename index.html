@@ -1685,7 +1685,16 @@
               selectedTagIds.push(tagId);
             }
           });
-          choices[table][index].selectedTags = selectedTagIds;
+
+          // Associer les tags à la bonne source
+          const choice = value;
+          if (choice === "file1" || choice === "file2") {
+            if (!choices[table][index].selectedTagsPerSource) choices[table][index].selectedTagsPerSource = {};
+            choices[table][index].selectedTagsPerSource[choice] = selectedTagIds;
+          } else {
+            // Pour 'both', on applique les tags à chaque source
+            choices[table][index].selectedTags = selectedTagIds;
+          }
         }
       });
 
