@@ -2225,17 +2225,18 @@ def merge_platform_metadata(merged_db_path, db1_path, db2_path):
 
 
 def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_mapping, tag_id_map):
-    print("\n[🔁 APPLICATION DES selectedTags]")
+    print("\n[⚡ APPLICATION RAPIDE DES selectedTags]")
 
     with sqlite3.connect(merged_db_path) as conn:
         cursor = conn.cursor()
+        processed_notes = set()
 
         for index_str, note_data in note_choices.items():
             if not isinstance(note_data, dict):
                 continue
 
             selected_tags = note_data.get("selectedTags", [])
-            if not isinstance(selected_tags, list):
+            if not isinstance(selected_tags, list) or not selected_tags:
                 continue
 
             choice = note_data.get("choice")
@@ -2250,32 +2251,40 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
 
                 old_note_id = note.get("NoteId")
                 new_note_id = note_mapping.get((source_db, old_note_id))
-                if not new_note_id:
+                if not new_note_id or new_note_id in processed_notes:
                     continue
 
-                # 🧹 Supprimer les anciens TagMap
+                print(f"[🧪] Appliquer selectedTags sur NoteId={new_note_id} ({source_key})")
+                processed_notes.add(new_note_id)
+
+                # 🔥 Supprimer toutes les anciennes associations
                 cursor.execute("DELETE FROM TagMap WHERE NoteId = ?", (new_note_id,))
 
-                for tag_id in selected_tags:
-                    new_tag_id = tag_id_map.get((source_db, tag_id))
+                # ✅ Ajouter les nouvelles sans doublon
+                unique_selected_tags = list(set(selected_tags))
+                for tag_id in unique_selected_tags:
+                    new_tag_id = (
+                        tag_id_map.get((source_db, tag_id)) or
+                        tag_id_map.get((db2_path if source_db == db1_path else db1_path, tag_id))
+                    )
                     if not new_tag_id:
                         continue
 
                     cursor.execute("""
-                        SELECT 1 FROM TagMap WHERE NoteId = ? AND TagId = ?
-                    """, (new_note_id, new_tag_id))
-                    if not cursor.fetchone():
-                        cursor.execute("SELECT COALESCE(MAX(Position), 0) + 1 FROM TagMap WHERE TagId = ?",
-                                       (new_tag_id,))
-                        position = cursor.fetchone()[0]
+                        SELECT COALESCE(MAX(Position), 0) + 1 FROM TagMap WHERE TagId = ?
+                    """, (new_tag_id,))
+                    position = cursor.fetchone()[0]
 
-                        cursor.execute("""
-                            INSERT INTO TagMap (NoteId, TagId, Position)
-                            VALUES (?, ?, ?)
-                        """, (new_note_id, new_tag_id, position))
+                    cursor.execute("""
+                        INSERT INTO TagMap (NoteId, TagId, Position)
+                        VALUES (?, ?, ?)
+                    """, (new_note_id, new_tag_id, position))
+
+                break  # ✅ Une fois appliqué sur une source valide, inutile de continuer
 
         conn.commit()
-    print("✅ selectedTags appliqués correctement aux notes.")
+
+    print("✅ selectedTags appliqués efficacement.")
 
 
 @app.route('/merge', methods=['POST'])
