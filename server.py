@@ -2276,6 +2276,8 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
                         """, (new_tag_id,))
                         position = cursor.fetchone()[0]
 
+                        print(f"📝 Insertion prévue: NoteId={new_note_id}, TagId={new_tag_id}, Position={position}")
+
                         cursor.execute("""
                             INSERT INTO TagMap (NoteId, TagId, Position)
                             VALUES (?, ?, ?)
