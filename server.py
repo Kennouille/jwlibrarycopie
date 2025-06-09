@@ -179,11 +179,11 @@ def prepare_preview():
         tags1 = extract_table(conn1, "Tag")
         tags2 = extract_table(conn2, "Tag")
 
-        # Extraire TagMap pour chaque fichier et ne garder que les entrées liées à Note
+        # Extraire TagMap pour chaque fichier (aucun filtre appliqué)
         tagmaps1_all = extract_table(conn1, "TagMap")
-        tagmaps1 = [entry for entry in tagmaps1_all if entry.get("NoteId") is not None]
+        tagmaps1 = tagmaps1_all  # on garde tout
         tagmaps2_all = extract_table(conn2, "TagMap")
-        tagmaps2 = [entry for entry in tagmaps2_all if entry.get("NoteId") is not None]
+        tagmaps2 = tagmaps2_all  # on garde tout
 
         conn1.close()
         conn2.close()
@@ -338,7 +338,7 @@ def compare_tags_with_preview(file1_db, file2_db):
     conn1 = sqlite3.connect(file1_db)
     conn2 = sqlite3.connect(file2_db)
     cur1 = conn1.cursor()
-    cur2 = cur2.cursor()
+    cur2 = conn2.cursor()
 
     cur1.execute("SELECT TagId, Name FROM Tag")
     tags1 = {row[0]: row[1] for row in cur1.fetchall()}
@@ -588,18 +588,16 @@ def merge_bookmarks(merged_db_path, file1_db, file2_db, location_id_map, bookmar
     bookmarks1 = fetch_bookmarks(file1_db)
     bookmarks2 = fetch_bookmarks(file2_db)
 
-    max_len = max(len(bookmarks1), len(bookmarks2))
-    for index in range(max_len):
-        row1 = bookmarks1[index] if index < len(bookmarks1) else None
-        row2 = bookmarks2[index] if index < len(bookmarks2) else None
+    for key, choice_data in bookmark_choices.items():
+        if not isinstance(choice_data, dict):
+            continue  # sécurité
 
-        choice_data = bookmark_choices.get(str(index), "file1")
-        if isinstance(choice_data, str):
-            choice = choice_data
-            edited = {}
-        else:
-            choice = choice_data.get("choice", "file1")
-            edited = choice_data.get("edited", {})
+        choice = choice_data.get("choice", "file1")
+        edited = choice_data.get("edited", {})
+        bookmark_ids = choice_data.get("bookmarkIds", {})
+
+        row1 = next((b for b in bookmarks1 if b[0] == bookmark_ids.get("file1")), None)
+        row2 = next((b for b in bookmarks2 if b[0] == bookmark_ids.get("file2")), None)
 
         to_insert = []
         if choice == "file1" and row1:
@@ -724,36 +722,32 @@ def merge_notes(merged_db_path, db1_path, db2_path, location_id_map, usermark_gu
     notes1 = fetch_notes(db1_path)
     notes2 = fetch_notes(db2_path)
 
-    print(f"📜 Notes extraites de {db1_path} : {[row[0] for row in notes1]}")  # Ajout ici
-    print(f"📜 Notes extraites de {db2_path} : {[row[0] for row in notes2]}")  # Ajout ici
-
     conn = sqlite3.connect(merged_db_path)
     cursor = conn.cursor()
 
-    max_len = max(len(notes1), len(notes2))
-    for index in range(max_len):
-        row1 = notes1[index] if index < len(notes1) else None
-        row2 = notes2[index] if index < len(notes2) else None
+    for key, choice_data in note_choices.items():
+        if not isinstance(choice_data, dict):
+            continue  # sécurité
 
-        choice_data = note_choices.get(str(index), "both")
-        if isinstance(choice_data, dict):
-            choice = choice_data.get("choice", "both")
-            edited = choice_data.get("edited", {})
-        else:
-            choice = choice_data
-            edited = note_choices.get(str(index), {}).get("edited", {})
+        choice = choice_data.get("choice", "both")
+        edited = choice_data.get("edited", {})
+        note_ids = choice_data.get("noteIds", {})
 
         to_insert = []
-        if choice == "file1" and row1:
-            to_insert = [(row1, db1_path)]
-        elif choice == "file2" and row2:
-            to_insert = [(row2, db2_path)]
-        elif choice == "both":
+
+        if choice in ("file1", "both") and "file1" in note_ids:
+            note_id = note_ids["file1"]
+            row1 = next((r for r in notes1 if r[0] == note_id), None)
             if row1:
                 to_insert.append((row1, db1_path))
+
+        if choice in ("file2", "both") and "file2" in note_ids:
+            note_id = note_ids["file2"]
+            row2 = next((r for r in notes2 if r[0] == note_id), None)
             if row2:
                 to_insert.append((row2, db2_path))
-        elif choice == "ignore":
+
+        if choice == "ignore":
             continue
 
         for row, source_db in to_insert:
@@ -1579,7 +1573,13 @@ def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, loca
                     if new_tag_id is None:
                         continue
 
-                    new_note_id = note_mapping.get((db_path, note_id)) if note_id else None
+                    if note_id:
+                        new_note_id = note_mapping.get((db_path, note_id))
+                        if new_note_id is None:
+                            continue  # La note a été ignorée → on saute ce TagMap
+                    else:
+                        new_note_id = None
+
                     new_location_id = location_id_map.get((db_path, location_id)) if location_id else None
                     new_playlist_item_id = item_id_map.get((db_path, playlist_item_id)) if playlist_item_id else None
 

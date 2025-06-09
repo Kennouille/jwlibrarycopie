@@ -1709,6 +1709,18 @@
               choice === "file1" ? selectedTagIdsFile1 : selectedTagIdsFile2;
           }
         }
+
+        // 📌 Ajoute les BookmarkId réels
+        if (table === "bookmarks") {
+          const bookmarkObj1 = previewDataEdited.bookmarks.file1?.[index];
+          const bookmarkObj2 = previewDataEdited.bookmarks.file2?.[index];
+          const bookmarkId1 = bookmarkObj1?.BookmarkId;
+          const bookmarkId2 = bookmarkObj2?.BookmarkId;
+
+          if (!choices.bookmarks[index].bookmarkIds) choices.bookmarks[index].bookmarkIds = {};
+          if (bookmarkId1) choices.bookmarks[index].bookmarkIds.file1 = bookmarkId1;
+          if (bookmarkId2) choices.bookmarks[index].bookmarkIds.file2 = bookmarkId2;
+        }
       });
 
       const response = await fetch(`${BASE_URL}/merge`, {
