@@ -714,6 +714,9 @@ def merge_notes(merged_db_path, db1_path, db2_path, location_id_map, usermark_gu
     notes1 = fetch_notes(db1_path)
     notes2 = fetch_notes(db2_path)
 
+    print(f"📜 Notes extraites de {db1_path} : {[row[0] for row in notes1]}")  # Ajout ici
+    print(f"📜 Notes extraites de {db2_path} : {[row[0] for row in notes2]}")  # Ajout ici
+
     conn = sqlite3.connect(merged_db_path)
     cursor = conn.cursor()
 
@@ -755,6 +758,8 @@ def merge_notes(merged_db_path, db1_path, db2_path, location_id_map, usermark_gu
             normalized_map = {(os.path.normpath(k[0]), k[1]): v for k, v in location_id_map.items()}
             new_location_id = normalized_map.get(normalized_key) if location_id else None
             new_usermark_id = usermark_guid_map.get(usermark_guid) if usermark_guid else None
+
+            print(f"🔍 Vérification avant insertion dans note_mapping: source_db={source_db}, old_note_id={old_note_id}")
 
             if new_location_id is None:
                 print(f"⚠️ LocationId introuvable pour Note guid={guid} (source: {source_db}), ignorée.")
