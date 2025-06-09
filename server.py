@@ -1557,7 +1557,12 @@ def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, loca
                 tag_id_map[(db_path, tag_id)] = new_tag_id
                 cursor.execute("INSERT INTO MergeMapping_Tag (SourceDb, OldTagId, NewTagId) VALUES (?, ?, ?)", (db_path, tag_id, new_tag_id))
 
-        # TagMap inchangé
+        # 🔧 Correction ici : normalisation des chemins pour note_mapping
+        normalized_note_mapping = {
+            (os.path.normpath(k[0]), k[1]): v
+            for k, v in note_mapping.items()
+        }
+
         cursor.execute("SELECT COALESCE(MAX(TagMapId), 0) FROM TagMap")
         max_tagmap_id = cursor.fetchone()[0]
         tagmap_id_map = {}
@@ -1574,7 +1579,7 @@ def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, loca
                         continue
 
                     if note_id:
-                        new_note_id = note_mapping.get((db_path, note_id))
+                        new_note_id = normalized_note_mapping.get((os.path.normpath(db_path), note_id))
                         if new_note_id is None:
                             continue  # La note a été ignorée → on saute ce TagMap
                     else:
