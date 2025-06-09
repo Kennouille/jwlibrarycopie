@@ -1688,12 +1688,25 @@
             if (!isNaN(tagId)) selectedTagIdsFile2.push(tagId);
           });
 
-          if (value === "both") {
+          // 📌 Ajoute les NoteId réels (utiles pour le backend fiable)
+          const noteObj1 = previewDataEdited.notes.file1?.[index];
+          const noteObj2 = previewDataEdited.notes.file2?.[index];
+          const noteId1 = noteObj1?.NoteId;
+          const noteId2 = noteObj2?.NoteId;
+
+          if (!choices[table][index].noteIds) choices[table][index].noteIds = {};
+          if (noteId1) choices[table][index].noteIds.file1 = noteId1;
+          if (noteId2) choices[table][index].noteIds.file2 = noteId2;
+
+          const choice = value;
+          if (choice === "both") {
             const merged = [...new Set([...selectedTagIdsFile1, ...selectedTagIdsFile2])];
             choices[table][index].selectedTags = merged;
           } else {
-            if (!choices[table][index].selectedTagsPerSource) choices[table][index].selectedTagsPerSource = {};
-            choices[table][index].selectedTagsPerSource[value] = value === "file1" ? selectedTagIdsFile1 : selectedTagIdsFile2;
+            if (!choices[table][index].selectedTagsPerSource)
+              choices[table][index].selectedTagsPerSource = {};
+            choices[table][index].selectedTagsPerSource[choice] =
+              choice === "file1" ? selectedTagIdsFile1 : selectedTagIdsFile2;
           }
         }
       });

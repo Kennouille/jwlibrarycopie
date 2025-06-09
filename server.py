@@ -2225,7 +2225,7 @@ def merge_platform_metadata(merged_db_path, db1_path, db2_path):
 
 
 def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_mapping, tag_id_map):
-    print("\n[🔁 APPLICATION DES selectedTags]")
+    print("\n[🔁 APPLICATION DES selectedTags — VERSION FIABLE AVEC ID RÉELS]")
 
     with sqlite3.connect(merged_db_path) as conn:
         cursor = conn.cursor()
@@ -2238,59 +2238,76 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
             if choice == "ignore":
                 continue
 
-            # 📌 Déterminer les tags à appliquer selon le choix
-            if choice == "both":
-                selected_tags = note_data.get("selectedTags", [])
-            else:
-                selected_tags = note_data.get("selectedTagsPerSource", {}).get(choice, [])
-
-            if not isinstance(selected_tags, list) or not selected_tags:
+            note_ids = note_data.get("noteIds", {})
+            if not isinstance(note_ids, dict):
                 continue
 
-            # 🔁 Appliquer les tags à la note fusionnée depuis la bonne source
-            for source_db in [db1_path, db2_path]:
-                source_key = "file1" if os.path.normpath(source_db) == os.path.normpath(db1_path) else "file2"
-                note = note_data.get("edited", {}).get(source_key)
-                if not note:
+            # === Cas "both" → un seul tableau selectedTags à appliquer aux deux notes ===
+            if choice == "both":
+                selected_tags = note_data.get("selectedTags", [])
+                if not isinstance(selected_tags, list):
                     continue
 
-                old_note_id = note.get("NoteId")
-                new_note_id = note_mapping.get((source_db, old_note_id))
-                if not new_note_id:
-                    continue
+                for source in ["file1", "file2"]:
+                    old_note_id = note_ids.get(source)
+                    if not old_note_id:
+                        continue
 
-                print(f"[🧩] Appliquer tags sur NoteId={new_note_id} (source {source_key})")
+                    source_db = db1_path if source == "file1" else db2_path
+                    new_note_id = note_mapping.get((source_db, old_note_id))
+                    if not new_note_id:
+                        continue
 
-                # 🔥 Supprimer tous les anciens TagMap pour cette note
-                cursor.execute("DELETE FROM TagMap WHERE NoteId = ?", (new_note_id,))
-
-                # ✅ Supprimer doublons dans les tags
-                unique_tag_ids = list(set(selected_tags))
-
-                for tag_id in unique_tag_ids:
-                    # Chercher dans la source d'origine en priorité, sinon dans l’autre
-                    for db in [source_db, db2_path if source_db == db1_path else db1_path]:
-                        new_tag_id = tag_id_map.get((db, tag_id))
+                    cursor.execute("DELETE FROM TagMap WHERE NoteId = ?", (new_note_id,))
+                    for tag_id in selected_tags:
+                        new_tag_id = tag_id_map.get((source_db, tag_id))
                         if not new_tag_id:
                             continue
 
-                        # Calculer position
-                        cursor.execute("SELECT COALESCE(MAX(Position), 0) + 1 FROM TagMap WHERE TagId = ?", (new_tag_id,))
+                        cursor.execute("""
+                            SELECT COALESCE(MAX(Position), 0) + 1 FROM TagMap WHERE TagId = ?
+                        """, (new_tag_id,))
                         position = cursor.fetchone()[0]
 
-                        # ✅ Insérer sans vérif préalable, car on a supprimé les anciens TagMap
                         cursor.execute("""
                             INSERT INTO TagMap (NoteId, TagId, Position)
                             VALUES (?, ?, ?)
                         """, (new_note_id, new_tag_id, position))
 
-                        break  # Stop après avoir trouvé une version valide du tag_id
+            # === Cas "file1" ou "file2" → on applique uniquement au fichier choisi ===
+            elif choice in ("file1", "file2"):
+                old_note_id = note_ids.get(choice)
+                if not old_note_id:
+                    continue
 
-                break  # Note traitée une fois suffit
+                selected_tags = note_data.get("selectedTagsPerSource", {}).get(choice, [])
+                if not isinstance(selected_tags, list):
+                    continue
+
+                source_db = db1_path if choice == "file1" else db2_path
+                new_note_id = note_mapping.get((source_db, old_note_id))
+                if not new_note_id:
+                    continue
+
+                cursor.execute("DELETE FROM TagMap WHERE NoteId = ?", (new_note_id,))
+                for tag_id in selected_tags:
+                    new_tag_id = tag_id_map.get((source_db, tag_id))
+                    if not new_tag_id:
+                        continue
+
+                    cursor.execute("""
+                        SELECT COALESCE(MAX(Position), 0) + 1 FROM TagMap WHERE TagId = ?
+                    """, (new_tag_id,))
+                    position = cursor.fetchone()[0]
+
+                    cursor.execute("""
+                        INSERT INTO TagMap (NoteId, TagId, Position)
+                        VALUES (?, ?, ?)
+                    """, (new_note_id, new_tag_id, position))
 
         conn.commit()
+    print("✅ Tags appliqués correctement avec les vrais NoteId.")
 
-    print("✅ selectedTags appliqués correctement aux notes.")
 
 
 @app.route('/merge', methods=['POST'])
