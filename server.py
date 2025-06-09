@@ -709,6 +709,7 @@ def merge_notes(merged_db_path, db1_path, db2_path, location_id_map, usermark_gu
                 FROM Note n
                 LEFT JOIN UserMark um ON n.UserMarkId = um.UserMarkId
             """)
+            print(f"📜 Notes extraites depuis {db_path} : {[row[0] for row in cur.fetchall()]}")
             return cur.fetchall()
 
     notes1 = fetch_notes(db1_path)
