@@ -2256,7 +2256,7 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
 
                     source_db = db1_path if source == "file1" else db2_path
                     new_note_id = note_mapping.get((source_db, old_note_id))
-                    print(f"Vérification avant suppression: old_note_id={old_note_id}, new_note_id={new_note_id}, source_db={source_db}")  # Ajout ici
+                    print(f"🔍 Mapping vérifié: old_note_id={old_note_id}, source_db={source_db}, new_note_id={new_note_id}")  # Ajout ici
 
                     if not new_note_id:
                         continue
