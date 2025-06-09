@@ -2226,6 +2226,7 @@ def merge_platform_metadata(merged_db_path, db1_path, db2_path):
 
 def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_mapping, tag_id_map):
     print("\n[🔁 APPLICATION DES selectedTags — VERSION FIABLE AVEC ID RÉELS]")
+    print("Données reçues par le backend:", note_choices)
 
     with sqlite3.connect(merged_db_path) as conn:
         cursor = conn.cursor()
