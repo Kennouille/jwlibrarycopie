@@ -704,13 +704,22 @@ def merge_notes(merged_db_path, db1_path, db2_path, location_id_map, usermark_gu
         with sqlite3.connect(db_path) as conn:
             cur = conn.cursor()
             cur.execute("""
-                SELECT n.NoteId, n.Guid, um.UserMarkGuid, n.LocationId, n.Title, n.Content,
-                       n.LastModified, n.Created, n.BlockType, n.BlockIdentifier
+                SELECT n.NoteId, n.Guid, n.UserMarkId, um.UserMarkGuid, n.LocationId,
+                       n.Title, n.Content, n.LastModified, n.Created, n.BlockType, n.BlockIdentifier
                 FROM Note n
                 LEFT JOIN UserMark um ON n.UserMarkId = um.UserMarkId
             """)
-            print(f"🔎 NoteId présents dans la base {db_path}: {cur.fetchall()}")
-            return cur.fetchall()
+            rows = []
+            for row in cur.fetchall():
+                note_id, guid, usermark_id, usermark_guid, location_id, title, content, lastmod, created, block_type, block_ident = row
+                if usermark_guid is None and usermark_id is not None:
+                    cur2 = conn.cursor()
+                    cur2.execute("SELECT UserMarkGuid FROM UserMark WHERE UserMarkId = ?", (usermark_id,))
+                    result = cur2.fetchone()
+                    usermark_guid = result[0] if result else None
+                rows.append((note_id, guid, usermark_guid, location_id, title, content, lastmod, created, block_type,
+                             block_ident))
+            return rows
 
     notes1 = fetch_notes(db1_path)
     notes2 = fetch_notes(db2_path)
