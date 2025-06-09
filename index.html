@@ -1723,6 +1723,8 @@
         })
       });
 
+      console.log("Données envoyées:", JSON.stringify({ local_datetime, choices }, null, 2));
+
       if (!response.ok) {
         const errorText = await response.text();
         showError(errorText || translations[window.currentLang].errors.mergeFailed);
