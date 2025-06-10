@@ -1000,6 +1000,10 @@
       console.log("🔍 Aperçu .notes :", previewData.notes);
       console.log("🔍 Aperçu .bookmarks :", previewData.bookmarks);
       console.log("🔍 Aperçu .tags :", previewData.tags);
+      console.log("🔍 Aperçu .tagMaps :", {
+        file1: previewData.tagMaps.file1.length,
+        file2: previewData.tagMaps.file2.length
+      });
 
       // Empêche l’erreur si previewData.notes est undefined
       if (!previewData.notes || !Array.isArray(previewData.notes.file1) || !Array.isArray(previewData.notes.file2)) {
