@@ -1100,12 +1100,13 @@
     });
 
     // ──────────────────────────────────────────────────────────────────────────────
-    //  INITIALISER previewDataEdited.tagMaps
+    //  INITIALISER previewDataEdited.tagMaps EN GARDANT DES TABLEAUX
     // ──────────────────────────────────────────────────────────────────────────────
     previewDataEdited.tagMaps = {
-      file1: {},
-      file2: {}
+      file1: (previewData.tagMaps.file1 || []).map(tm => ({ ...tm })),
+      file2: (previewData.tagMaps.file2 || []).map(tm => ({ ...tm }))
     };
+
 
     // ──────────────────────────────────────────────────────────────────────────────
     //  CONSTRUIRE previewDataEdited.tags.list PAR FICHIER
