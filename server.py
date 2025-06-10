@@ -715,8 +715,7 @@ def merge_notes(merged_db_path, db1_path, db2_path, location_id_map, usermark_gu
                     cur2.execute("SELECT UserMarkGuid FROM UserMark WHERE UserMarkId = ?", (usermark_id,))
                     result = cur2.fetchone()
                     usermark_guid = result[0] if result else None
-                rows.append((note_id, guid, usermark_guid, location_id, title, content, lastmod, created, block_type,
-                             block_ident))
+                rows.append((note_id, guid, usermark_guid, location_id, title, content, lastmod, created, block_type, block_ident))
             return rows
 
     notes1 = fetch_notes(db1_path)
@@ -725,86 +724,99 @@ def merge_notes(merged_db_path, db1_path, db2_path, location_id_map, usermark_gu
     conn = sqlite3.connect(merged_db_path)
     cursor = conn.cursor()
 
+    # --- 1) Fusion via choix utilisateur ---
     for key, choice_data in note_choices.items():
         if not isinstance(choice_data, dict):
-            continue  # sécurité
-
+            continue
         choice = choice_data.get("choice", "both")
         edited = choice_data.get("edited", {})
         note_ids = choice_data.get("noteIds", {})
-
         to_insert = []
-
         if choice in ("file1", "both") and "file1" in note_ids:
-            note_id = note_ids["file1"]
-            row1 = next((r for r in notes1 if r[0] == note_id), None)
-            if row1:
-                to_insert.append((row1, db1_path))
-
+            row1 = next((r for r in notes1 if r[0] == note_ids["file1"]), None)
+            if row1: to_insert.append((row1, db1_path))
         if choice in ("file2", "both") and "file2" in note_ids:
-            note_id = note_ids["file2"]
-            row2 = next((r for r in notes2 if r[0] == note_id), None)
-            if row2:
-                to_insert.append((row2, db2_path))
-
+            row2 = next((r for r in notes2 if r[0] == note_ids["file2"]), None)
+            if row2: to_insert.append((row2, db2_path))
         if choice == "ignore":
             continue
 
         for row, source_db in to_insert:
-            (old_note_id, guid, usermark_guid, location_id, title, content,
-             last_modified, created, block_type, block_identifier) = row
-
+            old_note_id, guid, usermark_guid, location_id, title, content, last_modified, created, block_type, block_identifier = row
             source_key = "file1" if os.path.normpath(source_db) == os.path.normpath(db1_path) else "file2"
-            title = edited.get(source_key, {}).get("Title", title)
+            title   = edited.get(source_key, {}).get("Title", title)
             content = edited.get(source_key, {}).get("Content", content)
 
-            normalized_key = (os.path.normpath(source_db), location_id)
-            normalized_map = {(os.path.normpath(k[0]), k[1]): v for k, v in location_id_map.items()}
-            new_location_id = normalized_map.get(normalized_key) if location_id else None
-            new_usermark_id = usermark_guid_map.get(usermark_guid) if usermark_guid else None
-
-            print(f"🔍 Vérification avant insertion dans note_mapping: source_db={source_db}, old_note_id={old_note_id}")
-
-            if new_location_id is None:
-                print(f"⚠️ LocationId introuvable pour Note guid={guid} (source: {source_db}), ignorée.")
+            # normaliser location & usermark
+            norm_map = {(os.path.normpath(k[0]), k[1]): v for k, v in location_id_map.items()}
+            new_loc = norm_map.get((os.path.normpath(source_db), location_id)) if location_id else None
+            new_um  = usermark_guid_map.get(usermark_guid) if usermark_guid else None
+            if new_loc is None:
                 continue
 
+            # existence check
             cursor.execute("SELECT NoteId, Title, Content FROM Note WHERE Guid = ?", (guid,))
             existing = cursor.fetchone()
-            if existing:
-                existing_note_id, existing_title, existing_content = existing
-                if existing_title == title and existing_content == content:
-                    note_mapping[(source_db, old_note_id)] = existing_note_id
-                    continue
-                else:
-                    guid_to_insert = str(uuid.uuid4())
-            else:
-                guid_to_insert = guid
+            if existing and existing[1] == title and existing[2] == content:
+                note_mapping[(source_db, old_note_id)] = existing[0]
+                continue
+            guid_to_insert = (existing and (existing[1], existing[2]) != (title, content)) and str(uuid.uuid4()) or guid
 
             cursor.execute("""
                 INSERT INTO Note
-                (Guid, UserMarkId, LocationId, Title, Content,
-                 LastModified, Created, BlockType, BlockIdentifier)
+                  (Guid, UserMarkId, LocationId, Title, Content,
+                   LastModified, Created, BlockType, BlockIdentifier)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                guid_to_insert,
-                new_usermark_id,
-                new_location_id,
-                title,
-                content,
-                last_modified,
-                created,
-                block_type,
-                block_identifier
-            ))
-            new_note_id = cursor.lastrowid
-
-            note_mapping[(source_db, old_note_id)] = new_note_id
+            """, (guid_to_insert, new_um, new_loc,
+                  title, content, last_modified, created,
+                  block_type, block_identifier))
+            new_id = cursor.lastrowid
+            note_mapping[(source_db, old_note_id)] = new_id
             inserted += 1
+
+    # --- 2) Ajout de toutes les autres notes de db1_path non mappées ---
+    for old_note_id, guid, usermark_guid, location_id, title, content, last_modified, created, block_type, block_identifier in notes1:
+        key1 = (db1_path, old_note_id)
+        if key1 in note_mapping:
+            continue
+        norm_map = {(os.path.normpath(k[0]), k[1]): v for k, v in location_id_map.items()}
+        new_loc = norm_map.get((os.path.normpath(db1_path), location_id)) if location_id else None
+        new_um  = usermark_guid_map.get(usermark_guid) if usermark_guid else None
+        if new_loc is None:
+            continue
+        cursor.execute("""
+            INSERT INTO Note
+              (Guid, UserMarkId, LocationId, Title, Content,
+               LastModified, Created, BlockType, BlockIdentifier)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (guid, new_um, new_loc, title, content,
+              last_modified, created, block_type, block_identifier))
+        note_mapping[key1] = cursor.lastrowid
+        inserted += 1
+
+    # --- 3) Ajout de toutes les autres notes de db2_path non mappées ---
+    for old_note_id, guid, usermark_guid, location_id, title, content, last_modified, created, block_type, block_identifier in notes2:
+        key2 = (db2_path, old_note_id)
+        if key2 in note_mapping:
+            continue
+        norm_map = {(os.path.normpath(k[0]), k[1]): v for k, v in location_id_map.items()}
+        new_loc = norm_map.get((os.path.normpath(db2_path), location_id)) if location_id else None
+        new_um  = usermark_guid_map.get(usermark_guid) if usermark_guid else None
+        if new_loc is None:
+            continue
+        cursor.execute("""
+            INSERT INTO Note
+              (Guid, UserMarkId, LocationId, Title, Content,
+               LastModified, Created, BlockType, BlockIdentifier)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (guid, new_um, new_loc, title, content,
+              last_modified, created, block_type, block_identifier))
+        note_mapping[key2] = cursor.lastrowid
+        inserted += 1
 
     conn.commit()
     conn.close()
-    print(f"✅ Total notes insérées: {inserted}")
+    print(f"✅ Total notes insérées : {inserted}")
     return note_mapping
 
 
