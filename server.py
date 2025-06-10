@@ -1483,9 +1483,6 @@ def compare_data():
     return response, 200
 
 
-import os
-import sqlite3
-
 def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, location_id_map, item_id_map, tag_choices):
     print("\n[FUSION TAGS ET TAGMAP - AVEC CHOIX UTILISATEUR]")
 
@@ -1609,6 +1606,9 @@ def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, loca
                 """)
                 rows = src_cursor.fetchall()
 
+                # 🔢 Debug : combien de lignes TagMap lues dans cette source
+                print(f"🔢 {len(rows)} TagMap rows read from {db_path}")
+
                 # 🔢 Debug : liste de tous les NoteId source
                 all_note_ids = [r[3] for r in rows if r[3] is not None]
                 distinct_ids = sorted(set(all_note_ids))
@@ -1684,6 +1684,9 @@ def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, loca
                     """, (db_path, old_tm_id, new_tagmap_id))
 
                     tagmap_id_map[(db_path, old_tm_id)] = new_tagmap_id
+
+        # 🔢 Debug : combien de TagMap ont été réellement mappées ou insérées
+        print(f"🔢 Au total, {len(tagmap_id_map)} TagMap ont été mappées/inserées")
 
         print("✔ Fusion des Tags et TagMap terminée (avec choix utilisateur).")
         return tag_id_map, tagmap_id_map
