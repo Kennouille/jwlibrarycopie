@@ -1581,7 +1581,8 @@ def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, loca
                     if note_id:
                         new_note_id = normalized_note_mapping.get((os.path.normpath(db_path), note_id))
                         if new_note_id is None:
-                            continue  # La note a été ignorée → on saute ce TagMap
+                            print(f"⛔ Ignoré TagMap {old_tagmap_id}: note_id={note_id} PAS trouvée dans note_mapping")
+                            continue
                     else:
                         new_note_id = None
 
