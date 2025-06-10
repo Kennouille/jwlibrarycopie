@@ -2682,6 +2682,7 @@ def merge_data():
 
         # --- Étape 1 : Fusion des Tags et TagMap (pour obtenir tag_id_map) ---
         try:
+            print("🐞 [CALLING merge_tags_and_tagmap]")
             tag_id_map, tagmap_id_map = merge_tags_and_tagmap(
                 merged_db_path,
                 file1_db,
