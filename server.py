@@ -1692,7 +1692,6 @@ def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, loca
         return tag_id_map, tagmap_id_map
 
 
-
 def merge_playlist_items(merged_db_path, file1_db, file2_db, im_mapping=None):
     """
     Fusionne PlaylistItem de façon idempotente.
