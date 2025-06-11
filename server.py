@@ -2415,7 +2415,6 @@ def merge_data():
     conn = None  # pour le finally
 
     try:
-        global note_mapping  # Si vous souhaitez utiliser le scope global (optionnel)
         payload = request.get_json()
         conflict_choices_notes = payload.get("conflicts_notes", {})
         conflict_choices_highlights = payload.get("conflicts_highlights", {})
