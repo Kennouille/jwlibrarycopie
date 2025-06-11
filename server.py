@@ -2408,6 +2408,9 @@ def merge_data():
     item_id_map = {}
     marker_id_map = {}
     playlist_id_map = {}
+    tag_id_map = {}
+    tagmap_id_map = {}
+    note_mapping = {}
 
     conn = None  # pour le finally
 
