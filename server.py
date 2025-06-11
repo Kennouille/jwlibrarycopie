@@ -2393,7 +2393,6 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
     print("✅ Tags appliqués correctement avec les vrais NoteId.")
 
 
-
 @app.route('/merge', methods=['POST'])
 def merge_data():
     start_time = time.time()
@@ -2680,6 +2679,23 @@ def merge_data():
         print(f"🔢 note_mapping contient {len(note_mapping)} entrées")
         print("🔢 Clés note_mapping (extraits) :", list(note_mapping.keys())[:10])
 
+        # --- Étape 2 : Fusion des Notes avec les nouveaux TagIds ---
+        try:
+            note_mapping = merge_notes(
+                merged_db_path,
+                file1_db,
+                file2_db,
+                location_id_map,
+                usermark_guid_map,
+                payload.get("choices", {}).get("notes", {}),
+                tag_id_map  # ✅ ici maintenant
+            )
+        except Exception as e:
+            import traceback
+            print(f"❌ Erreur dans merge_notes : {e}")
+            traceback.print_exc()
+            raise
+
         # --- Étape 1 : Fusion des Tags et TagMap (pour obtenir tag_id_map) ---
         try:
             print("🐞 [CALLING merge_tags_and_tagmap]")
@@ -2698,23 +2714,6 @@ def merge_data():
             print(f"Exception capturée : {e}")
             traceback.print_exc()
             tag_id_map, tagmap_id_map = {}, {}
-
-        # --- Étape 2 : Fusion des Notes avec les nouveaux TagIds ---
-        try:
-            note_mapping = merge_notes(
-                merged_db_path,
-                file1_db,
-                file2_db,
-                location_id_map,
-                usermark_guid_map,
-                payload.get("choices", {}).get("notes", {}),
-                tag_id_map  # ✅ ici maintenant
-            )
-        except Exception as e:
-            import traceback
-            print(f"❌ Erreur dans merge_notes : {e}")
-            traceback.print_exc()
-            raise
 
         # --- Étape 3 : Réappliquer les catégories manuelles sélectionnées ---
         apply_selected_tags(
