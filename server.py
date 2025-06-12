@@ -2394,6 +2394,7 @@ def merge_data():
     start_time = time.time()
     # Au tout début du merge
     open(os.path.join(UPLOAD_FOLDER, "merge_in_progress"), "w").close()
+    print("🐞 [ENTER merge_data]", flush=True)
 
     # ─── 0. Initialisation des variables utilisées plus bas ─────────────────────────────
     merged_jwlibrary = None
@@ -2473,12 +2474,16 @@ def merge_data():
             tables = [t[0] for t in dbg_cur.fetchall()]
             print("Tables présentes dans merged_userData.db :", tables)
 
+        # ── Fusion des Location ──
+        print("🐞 [BEFORE merge_location_from_sources]", flush=True)
         try:
             location_id_map = merge_location_from_sources(merged_db_path, *required_dbs)
-            print("Location ID Map:", location_id_map)
+            # Si on arrive ici, la fonction s’est bien terminée
+            print("🐞 [AFTER merge_location_from_sources]", flush=True)
+            print("Location ID Map:", location_id_map, flush=True)
         except Exception as e:
             import traceback
-            print(f"❌ Erreur dans merge_location_from_sources : {e}")
+            print("❌ Exception DANS merge_location_from_sources :", e, flush=True)
             traceback.print_exc()
             raise
 
