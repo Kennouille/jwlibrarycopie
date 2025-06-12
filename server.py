@@ -2504,6 +2504,8 @@ def merge_data():
         else:
             print("✅ Aucun GUID en commun entre les deux sources")
 
+        print("🐞 [BEFORE merge_usermark_from_sources]", flush=True)
+
         try:
             usermark_guid_map = merge_usermark_from_sources(merged_db_path, file1_db, file2_db, location_id_map)
 
@@ -2512,6 +2514,8 @@ def merge_data():
             print(f"❌ Erreur dans merge_usermark_from_sources : {e}")
             traceback.print_exc()
             raise
+
+        print("🐞 [AFTER merge_usermark_from_sources]", flush=True)
 
         # Après le bloc try/except de merge_usermark_from_sources
         with sqlite3.connect(merged_db_path) as conn:
