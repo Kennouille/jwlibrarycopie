@@ -774,43 +774,40 @@ def merge_notes(merged_db_path, db1_path, db2_path, location_id_map, usermark_gu
             note_mapping[(source_db, old_note_id)] = new_id
             inserted += 1
 
-    # --- 2) Ajout de toutes les autres notes de db1_path non mappées ---
-    for old_note_id, guid, usermark_guid, location_id, title, content, last_modified, created, block_type, block_identifier in notes1:
+    # --- 2) AJOUTER TOUTES LES AUTRES NOTES DE db1_path non encore mappées ---
+    for old_note_id, guid, usermark_guid, location_id, title, content, last_mod, created, block_type, block_identifier in notes1:
         key1 = (db1_path, old_note_id)
         if key1 in note_mapping:
             continue
+        # normaliser location & usermark
         norm_map = {(os.path.normpath(k[0]), k[1]): v for k, v in location_id_map.items()}
         new_loc = norm_map.get((os.path.normpath(db1_path), location_id)) if location_id else None
-        new_um  = usermark_guid_map.get(usermark_guid) if usermark_guid else None
+        new_um = usermark_guid_map.get(usermark_guid) if usermark_guid else None
         if new_loc is None:
             continue
         cursor.execute("""
             INSERT INTO Note
-              (Guid, UserMarkId, LocationId, Title, Content,
-               LastModified, Created, BlockType, BlockIdentifier)
+            (Guid, UserMarkId, LocationId, Title, Content, LastModified, Created, BlockType, BlockIdentifier)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (guid, new_um, new_loc, title, content,
-              last_modified, created, block_type, block_identifier))
+        """, (guid, new_um, new_loc, title, content, last_mod, created, block_type, block_identifier))
         note_mapping[key1] = cursor.lastrowid
         inserted += 1
 
-    # --- 3) Ajout de toutes les autres notes de db2_path non mappées ---
-    for old_note_id, guid, usermark_guid, location_id, title, content, last_modified, created, block_type, block_identifier in notes2:
+    # --- 3) AJOUTER TOUTES LES AUTRES NOTES DE db2_path non encore mappées ---
+    for old_note_id, guid, usermark_guid, location_id, title, content, last_mod, created, block_type, block_identifier in notes2:
         key2 = (db2_path, old_note_id)
         if key2 in note_mapping:
             continue
         norm_map = {(os.path.normpath(k[0]), k[1]): v for k, v in location_id_map.items()}
         new_loc = norm_map.get((os.path.normpath(db2_path), location_id)) if location_id else None
-        new_um  = usermark_guid_map.get(usermark_guid) if usermark_guid else None
+        new_um = usermark_guid_map.get(usermark_guid) if usermark_guid else None
         if new_loc is None:
             continue
         cursor.execute("""
             INSERT INTO Note
-              (Guid, UserMarkId, LocationId, Title, Content,
-               LastModified, Created, BlockType, BlockIdentifier)
+            (Guid, UserMarkId, LocationId, Title, Content, LastModified, Created, BlockType, BlockIdentifier)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (guid, new_um, new_loc, title, content,
-              last_modified, created, block_type, block_identifier))
+        """, (guid, new_um, new_loc, title, content, last_mod, created, block_type, block_identifier))
         note_mapping[key2] = cursor.lastrowid
         inserted += 1
 
@@ -2697,6 +2694,10 @@ def merge_data():
             print(f"❌ Erreur dans merge_notes : {e}")
             traceback.print_exc()
             raise
+
+        print(f"🔢 note_mapping size before tag merge: {len(note_mapping)}", flush=True)
+        sample_keys = list(note_mapping.items())[:10]
+        print(f"🔢 Sample note_mapping entries: {sample_keys}", flush=True)
 
         # --- Étape 1 : Fusion des Tags et TagMap (pour obtenir tag_id_map) ---
         try:
