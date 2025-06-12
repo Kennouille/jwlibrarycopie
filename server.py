@@ -116,7 +116,7 @@ def merge_independent_media(merged_db_path, file1_db, file2_db):
 
         merged_conn.commit()
 
-    print("Fusion IndependentMedia terminée.")
+    print("Fusion IndependentMedia terminée.", flush=True)
     return mapping
 
 
@@ -689,7 +689,7 @@ def merge_bookmarks(merged_db_path, file1_db, file2_db, location_id_map, bookmar
 
     conn.commit()
     conn.close()
-    print("✔ Fusion Bookmarks terminée (avec choix utilisateur).")
+    print("✔ Fusion Bookmarks terminée (avec choix utilisateur).", flush=True)
     return mapping
 
 
@@ -813,7 +813,7 @@ def merge_notes(merged_db_path, db1_path, db2_path, location_id_map, usermark_gu
 
     conn.commit()
     conn.close()
-    print(f"✅ Total notes insérées : {inserted}")
+    print(f"✅ Total notes insérées : {inserted}", flush=True)
     return note_mapping
 
 
@@ -1021,9 +1021,9 @@ def merge_inputfields(merged_db_path, file1_db, file2_db, location_id_map):
 
         conn.commit()
 
-    print("\n=== [INPUTFIELD FINAL] ===")
-    print(f"✅ Lignes réinsérées   : {inserted_count}")
-    print(f"❌ LocationId manquants : {missing_count}")
+    print("\n=== [INPUTFIELD FINAL] ===", flush=True)
+    print(f"✅ Lignes réinsérées   : {inserted_count}", flush=True)
+    print(f"❌ LocationId manquants : {missing_count}", flush=True)
 
 
 def update_location_references(merged_db_path, location_replacements):
@@ -1191,7 +1191,7 @@ def merge_usermark_from_sources(merged_db_path, file1_db, file2_db, location_id_
 
     conn.commit()
     conn.close()
-    print("Fusion UserMark terminée (idempotente).")
+    print("Fusion UserMark terminée (idempotente).", flush=True)
     return mapping
 
 
@@ -1342,9 +1342,8 @@ def merge_location_from_sources(merged_db_path, file1_db, file2_db):
 
         conn.commit()
 
-    print("✔ Fusion Location terminée.")
+    print("✔ Fusion Location terminée.", flush=True)
     return location_id_map
-
 
 
 @app.route('/upload', methods=['GET', 'POST'])
@@ -1685,7 +1684,7 @@ def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, loca
         # 🔢 Debug : combien de TagMap ont été réellement mappées ou insérées
         print(f"🔢 Au total, {len(tagmap_id_map)} TagMap ont été mappées/inserées")
 
-        print("✔ Fusion des Tags et TagMap terminée (avec choix utilisateur).")
+        print("✔ Fusion des Tags et TagMap terminée (avec choix utilisateur).", flush=True)
         return tag_id_map, tagmap_id_map
 
 
@@ -1784,7 +1783,7 @@ def merge_playlist_items(merged_db_path, file1_db, file2_db, im_mapping=None):
 
     conn.commit()
     conn.close()
-    print(f"Total PlaylistItems mappés: {len(mapping)}")
+    print(f"Total PlaylistItems mappés: {len(mapping)}", flush=True)
     return mapping
 
 
@@ -1817,7 +1816,7 @@ def merge_playlist_item_accuracy(merged_db_path, file1_db, file2_db):
 
     conn.commit()
     conn.close()
-    print(f"ID max final: {max_acc_id}")
+    print(f"ID max final: {max_acc_id}", flush=True)
     return max_acc_id
 
 
@@ -1872,7 +1871,7 @@ def merge_playlist_item_location_map(merged_db_path, file1_db, file2_db, item_id
     print(f"📊 Résultat: {total_inserted} lignes insérées, {total_skipped} ignorées")
     cursor.execute("SELECT COUNT(*) FROM PlaylistItemLocationMap")
     count = cursor.fetchone()[0]
-    print(f"🔍 Total final dans PlaylistItemLocationMap: {count} lignes")
+    print(f"🔍 Total final dans PlaylistItemLocationMap: {count} lignes", flush=True)
 
     conn.close()
 
@@ -1886,7 +1885,7 @@ def cleanup_playlist_item_location_map(conn):
         )
     """)
     conn.commit()
-    print("🧹 Nettoyage post-merge : PlaylistItemLocationMap nettoyée.")
+    print("🧹 Nettoyage post-merge : PlaylistItemLocationMap nettoyée.", flush=True)
 
 
 def merge_playlist_item_independent_media_map(merged_db_path, file1_db, file2_db, item_id_map, independent_media_map):
@@ -1936,7 +1935,7 @@ def merge_playlist_item_independent_media_map(merged_db_path, file1_db, file2_db
 
     conn.commit()
     conn.close()
-    print(f"✅ PlaylistItemIndependentMediaMap : {inserted} insérés, {skipped} ignorés.")
+    print(f"✅ PlaylistItemIndependentMediaMap : {inserted} insérés, {skipped} ignorés.", flush=True)
 
 
 def merge_playlist_item_marker(merged_db_path, file1_db, file2_db, item_id_map):
@@ -2165,7 +2164,7 @@ def merge_playlists(merged_db_path, file1_db, file2_db, location_id_map, indepen
         playlist_item_total = len(item_id_map)
 
         print("\n🧪 DEBUG FINAL DANS merge_playlists")
-        print("Item ID Map complet:")
+        print("Item ID Map complet:", flush=True)
         for (src, old_id), new_id in item_id_map.items():
             print(f"  {src} — {old_id} → {new_id}")
 
@@ -2387,7 +2386,7 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
                     """, (new_note_id, new_tag_id, position))
 
         conn.commit()
-    print("✅ Tags appliqués correctement avec les vrais NoteId.")
+    print("✅ Tags appliqués correctement avec les vrais NoteId.", flush=True)
 
 
 @app.route('/merge', methods=['POST'])
