@@ -1728,6 +1728,8 @@
         }
       });
 
+      console.log("🚀 PAYLOAD ENVOYÉ DEPUIS LE FRONTEND:", JSON.stringify({ local_datetime, choices }, null, 2));
+
       const response = await fetch(`${BASE_URL}/merge`, {
         method: "POST",
         headers: {
