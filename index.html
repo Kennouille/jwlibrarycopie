@@ -1681,17 +1681,19 @@
           const selectedTagIdsFile1 = [];
           const selectedTagIdsFile2 = [];
 
-          const tagSelectsFile1 = document.querySelectorAll(`.note-tags-select[data-index="${index}"][data-source="file1"]`);
+          // DÉBUT DE LA CORRECTION : Utilisation de data-file au lieu de data-source
+          const tagSelectsFile1 = document.querySelectorAll(`.note-tags-select[data-index="${index}"][data-file="file1"]`);
           tagSelectsFile1.forEach(tagSelect => {
             const tagId = parseInt(tagSelect.value);
             if (!isNaN(tagId)) selectedTagIdsFile1.push(tagId);
           });
 
-          const tagSelectsFile2 = document.querySelectorAll(`.note-tags-select[data-index="${index}"][data-source="file2"]`);
+          const tagSelectsFile2 = document.querySelectorAll(`.note-tags-select[data-index="${index}"][data-file="file2"]`);
           tagSelectsFile2.forEach(tagSelect => {
             const tagId = parseInt(tagSelect.value);
             if (!isNaN(tagId)) selectedTagIdsFile2.push(tagId);
           });
+          // FIN DE LA CORRECTION
 
           // 📌 Ajoute les NoteId réels (utiles pour le backend fiable)
           const noteObj1 = previewDataEdited.notes.file1?.[index];
