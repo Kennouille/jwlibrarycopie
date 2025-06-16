@@ -3024,32 +3024,6 @@ def merge_data():
             for k, v in item_id_map.items():
                 print(f"  {k} → {v}")
 
-            # --- Avant fusion Tags et TagMap, on affiche note_mapping ---
-            print("📦 Avant merge_tags_and_tagmap (2) :")
-            print(f"🔢 note_mapping contient {len(note_mapping)} entrées")
-            print("🔢 Clés note_mapping (extraits) :", list(note_mapping.keys())[:10])
-
-            # --- Étape 1 : fusion des Tags et TagMap (utilise location_id_map) ---
-            try:
-                tag_id_map, tagmap_id_map = merge_tags_and_tagmap(
-                    merged_db_path,
-                    file1_db,
-                    file2_db,
-                    note_mapping,
-                    location_id_map,
-                    item_id_map,
-                    payload.get("choices", {}).get("tags", {})
-                )
-                print(f"✔ merge_tags_and_tagmap réussi :")
-                print(f"  Tag ID Map contient {len(tag_id_map)} entrées")
-                print(f"  TagMap ID Map contient {len(tagmap_id_map)} entrées")
-            except Exception as e:
-                import traceback
-                print("❌ Échec de merge_tags_and_tagmap (mais on continue le merge global) :")
-                print(f"Exception capturée : {e}")
-                traceback.print_exc()
-                tag_id_map, tagmap_id_map = {}, {}
-
             print(f"Tag ID Map: {tag_id_map}")
             print(f"TagMap ID Map: {tagmap_id_map}")
 
