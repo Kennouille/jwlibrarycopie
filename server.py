@@ -1242,9 +1242,11 @@ def merge_location_from_sources(merged_db_path, file1_db, file2_db):
     """
     Fusionne les enregistrements de la table Location depuis file1 et file2
     dans la base fusionnée de façon idempotente.
-    Retourne un dictionnaire {(source_db, old_id) : new_id}.
+    Retourne un dictionnaire {(source_db, old_id): new_id}.
     """
-    print("\n[FUSION LOCATION - IDÉMPOTENTE]")
+    # Entrée de la fonction
+    print("🐞 [ENTER merge_location_from_sources]", file=sys.stderr, flush=True)
+    print("\n[FUSION LOCATION - IDÉMPOTENTE]", flush=True)
 
     def read_locations(db_path):
         with sqlite3.connect(db_path) as conn:
@@ -1263,7 +1265,7 @@ def merge_location_from_sources(merged_db_path, file1_db, file2_db):
     with sqlite3.connect(merged_db_path) as conn:
         cur = conn.cursor()
 
-        # Créer la table de mapping MergeMapping_Location si absente
+        # Créer la table de mapping si elle n'existe pas
         cur.execute("""
             CREATE TABLE IF NOT EXISTS MergeMapping_Location (
                 SourceDb TEXT,
@@ -1272,9 +1274,10 @@ def merge_location_from_sources(merged_db_path, file1_db, file2_db):
                 PRIMARY KEY (SourceDb, OldID)
             )
         """)
-        print("🐞 [BEFORE commit in merge_location_from_sources]", flush=True)
+        # Premier commit pour créer la table
+        print("🐞 [BEFORE commit in merge_location_from_sources]", file=sys.stderr, flush=True)
         conn.commit()
-        print("🐞 [AFTER commit in merge_location_from_sources]", flush=True)
+        print("🐞 [AFTER commit in merge_location_from_sources]", file=sys.stderr, flush=True)
 
         # Récupérer le plus grand LocationId existant
         cur.execute("SELECT COALESCE(MAX(LocationId), 0) FROM Location")
@@ -1282,10 +1285,8 @@ def merge_location_from_sources(merged_db_path, file1_db, file2_db):
 
         location_id_map = {}
 
-        for entry in locations:
-            db_source, old_loc_id, book_num, chap_num, doc_id, track, issue, key_sym, meps_lang, loc_type, title = entry
-
-            # Vérifie si ce Location a déjà été fusionné
+        for db_source, old_loc_id, book_num, chap_num, doc_id, track, issue, key_sym, meps_lang, loc_type, title in locations:
+            # Vérifier mapping existant
             cur.execute("""
                 SELECT NewID FROM MergeMapping_Location
                 WHERE SourceDb = ? AND OldID = ?
@@ -1293,14 +1294,14 @@ def merge_location_from_sources(merged_db_path, file1_db, file2_db):
             res = cur.fetchone()
             if res:
                 new_id = res[0]
-                print(f"⏩ Location déjà fusionnée OldID={old_loc_id} → NewID={new_id} (Source: {db_source})")
+                print(f"⏩ Location déjà fusionnée OldID={old_loc_id} → NewID={new_id} (Source: {db_source})", flush=True)
                 location_id_map[(db_source, old_loc_id)] = new_id
                 continue
 
-            # Recherche d'une correspondance exacte (même contenu) avec gestion des NULL
+            # Recherche d'une correspondance exacte
             cur.execute("""
                 SELECT LocationId FROM Location
-                WHERE 
+                WHERE
                     BookNumber IS ? AND
                     ChapterNumber IS ? AND
                     DocumentId IS ? AND
@@ -1311,12 +1312,11 @@ def merge_location_from_sources(merged_db_path, file1_db, file2_db):
                     Type = ? AND
                     Title IS ?
             """, (book_num, chap_num, doc_id, track, issue, key_sym, meps_lang, loc_type, title))
-
             existing = cur.fetchone()
 
             if existing:
                 new_id = existing[0]
-                print(f"🔎 Location existante trouvée OldID={old_loc_id} → NewID={new_id} (Source: {db_source})")
+                print(f"🔎 Location existante trouvée OldID={old_loc_id} → NewID={new_id} (Source: {db_source})", flush=True)
             else:
                 # Pas trouvée → insertion
                 current_max_id += 1
@@ -1328,25 +1328,26 @@ def merge_location_from_sources(merged_db_path, file1_db, file2_db):
                          IssueTagNumber, KeySymbol, MepsLanguage, Type, Title)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (new_id, book_num, chap_num, doc_id, track, issue, key_sym, meps_lang, loc_type, title))
-                    print(f"✅ Location insérée : NewID={new_id} (Source: {db_source})")
+                    print(f"✅ Location insérée : NewID={new_id} (Source: {db_source})", flush=True)
                 except sqlite3.IntegrityError as e:
-                    print(f"❌ Erreur insertion Location OldID={old_loc_id}: {e}")
+                    print(f"❌ Erreur insertion Location OldID={old_loc_id}: {e}", flush=True)
                     continue
 
-            # Mapping ajouté
+            # Mettre à jour le mapping en mémoire et dans la table de mapping
             location_id_map[(db_source, old_loc_id)] = new_id
-
-            # Ajout du mapping dans MergeMapping_Location
             cur.execute("""
                 INSERT OR IGNORE INTO MergeMapping_Location (SourceDb, OldID, NewID)
                 VALUES (?, ?, ?)
             """, (db_source, old_loc_id, new_id))
 
+        # Commit final pour toutes les insertions de Location
         conn.commit()
 
-    print("🐞 [BEFORE final print]", file=sys.stderr, flush=True)
+    # Sortie de la fonction
+    print("🐞 [BEFORE final print in merge_location_from_sources]", file=sys.stderr, flush=True)
     print("✔ Fusion Location terminée.", file=sys.stderr, flush=True)
     print("🐞 [EXIT merge_location_from_sources]", file=sys.stderr, flush=True)
+
     return location_id_map
 
 
@@ -1484,7 +1485,9 @@ def compare_data():
 
 
 def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, location_id_map, item_id_map, tag_choices):
-    print("\n[FUSION TAGS ET TAGMAP - AVEC CHOIX UTILISATEUR]")
+    # Entrée de la fonction
+    print("🐞 [ENTER merge_tags_and_tagmap]", file=sys.stderr, flush=True)
+    print("\n[FUSION TAGS ET TAGMAP - AVEC CHOIX UTILISATEUR]", flush=True)
 
     # 🔢 Debug : taille et clés du note_mapping
     print(f"🔢 note_mapping contient {len(note_mapping)} entrées")
@@ -1612,7 +1615,6 @@ def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, loca
                 # 🔢 Debug : liste de tous les NoteId source
                 all_note_ids = [r[3] for r in rows if r[3] is not None]
                 distinct_ids = sorted(set(all_note_ids))
-                # On n'affiche que si on est sur la première itération pour éviter trop de logs
                 if db_path == file1_db:
                     print(f"🔢 {len(distinct_ids)} NoteId distincts en source 1 (ex : {distinct_ids[:10]})")
 
@@ -1632,11 +1634,9 @@ def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, loca
                     new_loc_id = location_id_map.get((db_path, location_id)) if location_id else None
                     new_pi_id  = item_id_map.get((db_path, playlist_item_id)) if playlist_item_id else None
 
-                    # Un seul ref non-null attendu
                     if sum(x is not None for x in [new_note_id, new_loc_id, new_pi_id]) != 1:
                         continue
 
-                    # Vérifier existant
                     cursor.execute("""
                         SELECT TagMapId FROM TagMap
                         WHERE TagId=?
@@ -1648,17 +1648,16 @@ def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, loca
                     if cursor.fetchone():
                         continue
 
-                    # Gestion cas LocationId seul
                     if new_loc_id is not None:
-                        cursor.execute("""
-                            SELECT TagMapId FROM TagMap WHERE TagId=? AND LocationId=?
-                        """, (new_tag_id, new_loc_id))
+                        cursor.execute(
+                            "SELECT TagMapId FROM TagMap WHERE TagId=? AND LocationId=?",
+                            (new_tag_id, new_loc_id)
+                        )
                         existing = cursor.fetchone()
                         if existing:
                             tagmap_id_map[(db_path, old_tm_id)] = existing[0]
                             continue
 
-                    # Calcul nouveau Position si conflit
                     tentative = position
                     while True:
                         cursor.execute(
@@ -1669,7 +1668,6 @@ def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, loca
                             break
                         tentative += 1
 
-                    # Insertion
                     max_tagmap_id += 1
                     new_tagmap_id = max_tagmap_id
                     cursor.execute("""
@@ -1688,8 +1686,11 @@ def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, loca
         # 🔢 Debug : combien de TagMap ont été réellement mappées ou insérées
         print(f"🔢 Au total, {len(tagmap_id_map)} TagMap ont été mappées/inserées")
 
-        print("✔ Fusion des Tags et TagMap terminée (avec choix utilisateur).", flush=True)
-        return tag_id_map, tagmap_id_map
+        # Sortie de la fonction
+        print("✔ Fusion des Tags et TagMap terminée (avec choix utilisateur).", file=sys.stderr, flush=True)
+        print("🐞 [EXIT merge_tags_and_tagmap]", file=sys.stderr, flush=True)
+
+    return tag_id_map, tagmap_id_map
 
 
 def merge_playlist_items(merged_db_path, file1_db, file2_db, im_mapping=None):
