@@ -2687,7 +2687,6 @@ def merge_data():
         conn.close()
 
         # --- Avant fusion Tags et TagMap, on affiche note_mapping ---
-        print("📦 Avant merge_tags_and_tagmap (1) :")
         print(f"🔢 note_mapping contient {len(note_mapping)} entrées")
         print("🔢 Clés note_mapping (extraits) :", list(note_mapping.keys())[:10])
 
@@ -2711,43 +2710,6 @@ def merge_data():
         print(f"🔢 note_mapping size before tag merge: {len(note_mapping)}", flush=True)
         sample_keys = list(note_mapping.items())[:10]
         print(f"🔢 Sample note_mapping entries: {sample_keys}", flush=True)
-
-        # … dans merge_data, juste là où tu fais :
-        print("🐞 [BEFORE merge_tags_and_tagmap]", flush=True)
-
-        # --- Étape 1 : Fusion des Tags et TagMap (pour obtenir tag_id_map) ---
-        try:
-            print("🐞 [CALLING merge_tags_and_tagmap]")
-            tag_id_map, tagmap_id_map = merge_tags_and_tagmap(
-                merged_db_path,
-                file1_db,
-                file2_db,
-                note_mapping,  # <-- on passe la vraie variable ici
-                location_id_map,
-                item_id_map,
-                payload.get("choices", {}).get("tags", {})
-            )
-            print("🐞 [AFTER merge_tags_and_tagmap]", flush=True)
-        except Exception as e:
-            import traceback
-            print("❌ Échec de merge_tags_and_tagmap (mais on continue le merge global) :")
-            print(f"Exception capturée : {e}")
-            traceback.print_exc()
-            tag_id_map, tagmap_id_map = {}, {}
-
-        # --- Étape 3 : Réappliquer les catégories manuelles sélectionnées ---
-        apply_selected_tags(
-            merged_db_path,
-            file1_db,
-            file2_db,
-            payload.get("choices", {}).get("notes", {}),
-            note_mapping,
-            tag_id_map
-        )
-
-        # --- Debug facultatif ---
-        print(f"Tag ID Map: {tag_id_map}")
-        print(f"TagMap ID Map: {tagmap_id_map}")
 
         try:
             with sqlite3.connect(merged_db_path) as conn:
@@ -3024,6 +2986,41 @@ def merge_data():
             for k, v in item_id_map.items():
                 print(f"  {k} → {v}")
 
+            # --- Avant fusion Tags et TagMap, on affiche note_mapping ---
+            print("📦 Avant merge_tags_and_tagmap (2) :")
+            print(f"🔢 note_mapping contient {len(note_mapping)} entrées")
+            print("🔢 Clés note_mapping (extraits) :", list(note_mapping.keys())[:10])
+
+            # --- Étape 1 : fusion des Tags et TagMap (utilise location_id_map) ---
+            try:
+                print("🐞 [BEFORE merge_tags_and_tagmap]", flush=True)
+                tag_id_map, tagmap_id_map = merge_tags_and_tagmap(
+                    merged_db_path,
+                    file1_db,
+                    file2_db,
+                    note_mapping,
+                    location_id_map,
+                    item_id_map,
+                    payload.get("choices", {}).get("tags", {})
+                )
+                print("🐞 [AFTER merge_tags_and_tagmap]", flush=True)
+            except Exception as e:
+                import traceback
+                print("❌ Échec de merge_tags_and_tagmap (mais on continue le merge global) :")
+                print(f"Exception capturée : {e}")
+                traceback.print_exc()
+                tag_id_map, tagmap_id_map = {}, {}
+
+            # --- Étape 3 : Réappliquer les catégories manuelles sélectionnées ---
+            apply_selected_tags(
+                merged_db_path,
+                file1_db,
+                file2_db,
+                payload.get("choices", {}).get("notes", {}),
+                note_mapping,
+                tag_id_map
+            )
+
             print(f"Tag ID Map: {tag_id_map}")
             print(f"TagMap ID Map: {tagmap_id_map}")
 
@@ -3106,8 +3103,6 @@ def merge_data():
             shutil.copy(clean_path, debug_copy_path)
             print(f"📤 Copie debug créée : {debug_copy_path}")
 
-
-
             # 7️⃣ Copie vers destination finale officielle pour le frontend
             # ⛔ final_db_dest = os.path.join(UPLOAD_FOLDER, "userData.db")
             # ⛔ shutil.copy(clean_path, final_db_dest)
@@ -3116,8 +3111,6 @@ def merge_data():
             # ✅ On force l’usage uniquement du fichier debug (3 lignes d'ajout pour n'envoyer que le fichier)
             final_db_dest = os.path.join(UPLOAD_FOLDER, "debug_cleaned_before_copy.db")
             print("🚫 Copie vers userData.db désactivée — envoi direct de debug_cleaned_before_copy.db")
-
-
 
             # ✅ Forcer la génération des fichiers WAL et SHM sur userData.db
             try:
