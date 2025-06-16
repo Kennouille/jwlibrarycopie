@@ -2459,7 +2459,6 @@ def merge_data():
         if not all(os.path.exists(db) for db in required_dbs):
             return jsonify({"error": "Fichiers source manquants"}), 400
 
-
         # Création de la DB fusionnée
         merged_db_path = os.path.join(UPLOAD_FOLDER, "merged_userData.db")
         if os.path.exists(merged_db_path):
