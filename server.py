@@ -1272,7 +1272,9 @@ def merge_location_from_sources(merged_db_path, file1_db, file2_db):
                 PRIMARY KEY (SourceDb, OldID)
             )
         """)
+        print("🐞 [BEFORE commit in merge_location_from_sources]", flush=True)
         conn.commit()
+        print("🐞 [AFTER commit in merge_location_from_sources]", flush=True)
 
         # Récupérer le plus grand LocationId existant
         cur.execute("SELECT COALESCE(MAX(LocationId), 0) FROM Location")
@@ -1342,7 +1344,9 @@ def merge_location_from_sources(merged_db_path, file1_db, file2_db):
 
         conn.commit()
 
+    print("🐞 [BEFORE final print in merge_location_from_sources]", flush=True)
     print("✔ Fusion Location terminée.", flush=True)
+    print("🐞 [EXIT merge_location_from_sources]", flush=True)
     return location_id_map
 
 
