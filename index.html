@@ -1578,7 +1578,22 @@
     try {
       const file1 = document.getElementById('file1').files[0];
       const file2 = document.getElementById('file2').files[0];
-      const localDatetime = document.getElementById('local_datetime').value;
+      let localDatetime = document.getElementById('local_datetime').value;
+
+      // Si le champ input est vide, générez la date/heure locale actuelle
+      if (!localDatetime) {
+          const now = new Date();
+          // Format ISO 8601 pour un datetime-local input (YYYY-MM-DDTHH:MM)
+          // On doit prendre soin des fuseaux horaires si on veut vraiment "local",
+          // mais pour un simple envoi, un format standard est suffisant.
+          const year = now.getFullYear();
+          const month = String(now.getMonth() + 1).padStart(2, '0'); // Mois est 0-indexé
+          const day = String(now.getDate()).padStart(2, '0');
+          const hours = String(now.getHours()).padStart(2, '0');
+          const minutes = String(now.getMinutes()).padStart(2, '0');
+
+          localDatetime = `${year}-${month}-${day}T${hours}:${minutes}`;
+      }
 
       if (!file1 || !file2)
         throw new Error(translations[window.currentLang].errors.selectFiles);
@@ -1678,22 +1693,28 @@
         };
 
         if (table === "notes") {
-          const selectedTagIdsFile1 = [];
-          const selectedTagIdsFile2 = [];
+          // Initialisez les listes pour stocker les TagIds COLLECTÉS par l'utilisateur
+          // pour les deux fichiers de la note courante.
+          const collectedTagIdsFile1 = [];
+          const collectedTagIdsFile2 = [];
 
-          // DÉBUT DE LA CORRECTION : Utilisation de data-file au lieu de data-source
-          const tagSelectsFile1 = document.querySelectorAll(`.note-tags-select[data-index="${index}"][data-file="file1"]`);
-          tagSelectsFile1.forEach(tagSelect => {
-            const tagId = parseInt(tagSelect.value);
-            if (!isNaN(tagId)) selectedTagIdsFile1.push(tagId);
-          });
+          // ⚠️ ATTENTION : collectez TOUS les select de tags pour la note actuelle,
+          // puis filtrez-les par data-file.
+          document.querySelectorAll(`.note-tags-select[data-index="${index}"]`).forEach(tagSelect => {
+              const tagId = parseInt(tagSelect.value); // Récupère le TagId sélectionné (ou NaN)
+              if (isNaN(tagId) || tagId === 0) { // 0 pourrait être "Aucune catégorie"
+                  // Ignore les sélections invalides ou "aucune catégorie"
+                  return;
+              }
 
-          const tagSelectsFile2 = document.querySelectorAll(`.note-tags-select[data-index="${index}"][data-file="file2"]`);
-          tagSelectsFile2.forEach(tagSelect => {
-            const tagId = parseInt(tagSelect.value);
-            if (!isNaN(tagId)) selectedTagIdsFile2.push(tagId);
+              const sourceFile = tagSelect.dataset.file; // 'file1' ou 'file2'
+
+              if (sourceFile === 'file1') {
+                  collectedTagIdsFile1.push(tagId);
+              } else if (sourceFile === 'file2') {
+                  collectedTagIdsFile2.push(tagId);
+              }
           });
-          // FIN DE LA CORRECTION
 
           // 📌 Ajoute les NoteId réels (utiles pour le backend fiable)
           const noteObj1 = previewDataEdited.notes.file1?.[index];
@@ -1705,16 +1726,28 @@
           if (noteId1) choices[table][index].noteIds.file1 = noteId1;
           if (noteId2) choices[table][index].noteIds.file2 = noteId2;
 
-          const choice = value;
+          const choice = value; // C'est le choix de fusion pour la note entière ("both", "file1", "file2", "ignore")
+
           if (choice === "both") {
-            const merged = [...new Set([...selectedTagIdsFile1, ...selectedTagIdsFile2])];
-            choices[table][index].selectedTags = merged;
+              // Pour "both", fusionnez les tags COLLECTÉS des deux fichiers et assurez l'unicité
+              const merged = [...new Set([...collectedTagIdsFile1, ...collectedTagIdsFile2])];
+              choices[table][index].selectedTags = merged;
           } else {
-            if (!choices[table][index].selectedTagsPerSource)
-              choices[table][index].selectedTagsPerSource = {};
-            choices[table][index].selectedTagsPerSource[choice] =
-              choice === "file1" ? selectedTagIdsFile1 : selectedTagIdsFile2;
+              // Pour "file1" ou "file2", stockez les tags COLLECTÉS pour la source choisie
+              if (!choices[table][index].selectedTagsPerSource)
+                  choices[table][index].selectedTagsPerSource = {};
+              choices[table][index].selectedTagsPerSource[choice] =
+                  choice === "file1" ? collectedTagIdsFile1 : collectedTagIdsFile2;
           }
+
+          // --- GESTION DU BRUIT DANS LE JSON (TagIds sous edited) ---
+          // Il est probable que le `TagIds` que vous voyez sous `edited.file1` et `edited.file2`
+          // provienne du `previewDataEdited` initial.
+          // Le backend ne devrait pas avoir besoin de ces TagIds là si vous envoyez `selectedTags` ou `selectedTagsPerSource`.
+          // Il faudrait nettoyer l'objet `edited` avant de l'envoyer,
+          // ou s'assurer que le backend ignore ces `TagIds` sous `edited`.
+          // Pour l'instant, laissons-le mais gardons-le à l'esprit si le JSON reste "bruité".
+          // Le plus important est que `selectedTags` ou `selectedTagsPerSource` soit correct.
         }
 
         // 📌 Ajoute les BookmarkId réels
