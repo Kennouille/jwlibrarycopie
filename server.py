@@ -2712,6 +2712,9 @@ def merge_data():
         sample_keys = list(note_mapping.items())[:10]
         print(f"🔢 Sample note_mapping entries: {sample_keys}", flush=True)
 
+        # … dans merge_data, juste là où tu fais :
+        print("🐞 [BEFORE merge_tags_and_tagmap]", flush=True)
+
         # --- Étape 1 : Fusion des Tags et TagMap (pour obtenir tag_id_map) ---
         try:
             print("🐞 [CALLING merge_tags_and_tagmap]")
@@ -2724,6 +2727,7 @@ def merge_data():
                 item_id_map,
                 payload.get("choices", {}).get("tags", {})
             )
+            print("🐞 [AFTER merge_tags_and_tagmap]", flush=True)
         except Exception as e:
             import traceback
             print("❌ Échec de merge_tags_and_tagmap (mais on continue le merge global) :")
