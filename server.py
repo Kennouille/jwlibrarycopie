@@ -1344,9 +1344,9 @@ def merge_location_from_sources(merged_db_path, file1_db, file2_db):
 
         conn.commit()
 
-    print("🐞 [BEFORE final print in merge_location_from_sources]", flush=True)
-    print("✔ Fusion Location terminée.", flush=True)
-    print("🐞 [EXIT merge_location_from_sources]", flush=True)
+    print("🐞 [BEFORE final print]", file=sys.stderr, flush=True)
+    print("✔ Fusion Location terminée.", file=sys.stderr, flush=True)
+    print("🐞 [EXIT merge_location_from_sources]", file=sys.stderr, flush=True)
     return location_id_map
 
 
