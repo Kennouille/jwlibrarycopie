@@ -1383,22 +1383,25 @@
 
     window.refreshNotesTab = function() {
       return new Promise((resolve) => {
-        const startBuildTime = Date.now(); // Temps de début de buildNotesTab
+        const startAnimationTime = Date.now(); // Le temps où l'animation commence
 
-        buildNotesTab(); // Exécuter la fonction qui prend du temps
+        // Déplacer l'exécution de buildNotesTab dans un setTimeout(0)
+        // pour permettre au thread principal de rendre l'animation.
+        setTimeout(() => {
+          buildNotesTab(); // Exécute le travail lourd de rendu
 
-        const elapsedBuildTime = Date.now() - startBuildTime;
-        // Si le temps de construction est inférieur au temps minimum désiré pour l'animation,
-        // on attend le reste du temps. Sinon, on résout immédiatement.
-        const remainingTime = MIN_LOAD_TIME_MS - elapsedBuildTime;
+          const elapsedBuildTime = Date.now() - startAnimationTime; // Temps total écoulé depuis le début de l'animation
+          const remainingTime = MIN_LOAD_TIME_MS - elapsedBuildTime;
 
-        if (remainingTime > 0) {
-          setTimeout(() => {
-            resolve(); // Résoudre la promesse après le délai minimum
-          }, remainingTime);
-        } else {
-          resolve(); // Résoudre la promesse immédiatement si le build a pris plus de temps que le minimum
-        }
+          if (remainingTime > 0) {
+            // S'assurer que la barre a un minimum de temps pour s'afficher
+            setTimeout(() => {
+              resolve();
+            }, remainingTime);
+          } else {
+            resolve(); // Résoudre immédiatement si le build a pris plus de temps que le MIN_LOAD_TIME_MS
+          }
+        }, 0); // <-- IMPORTANT : délai de 0ms ici
       });
     };
 
