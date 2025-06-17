@@ -1123,17 +1123,22 @@
 
   // Variables pour gérer les animations de barre de progression
   const progressAnimations = {};
-  const MIN_LOAD_TIME_MS = 3000; // 3 secondes pour le test, 30000ms pour 30 secondes
+  const MIN_LOAD_TIME_MS = 3000; // Ou 30000ms pour 30 secondes
 
   function startProgressBarAnimation(buttonElement, tabName) {
       const progressBar = buttonElement.querySelector('.progress-bar');
       if (!progressBar) return;
 
-      // Réinitialiser la barre
-      progressBar.style.width = '0%';
-      progressBar.style.transition = 'width 0.1s linear';
+      // Réinitialiser la barre en enlevant d'abord toutes les propriétés de style en ligne
+      progressBar.style.removeProperty('width');     // <-- Important pour que le CSS width: 0% s'applique
+      progressBar.style.removeProperty('transition'); // <-- C'EST LA LIGNE MANQUANTE / CRUCIALE
 
-      // Annimer toute animation existante
+      // Maintenant, appliquez la transition désirée pour cette animation
+      // Ce n'est pas strictement nécessaire ici si le CSS est parfait,
+      // mais peut servir de filet de sécurité.
+      // progressBar.style.transition = 'width 0.1s linear'; // Optionnel, car le CSS le fait.
+
+      // Annuler toute animation existante pour cet onglet
       if (progressAnimations[tabName]) {
           cancelAnimationFrame(progressAnimations[tabName].animationFrame);
           clearTimeout(progressAnimations[tabName].timeoutId);
@@ -1141,44 +1146,56 @@
 
       const startTime = Date.now();
       let animationFrameId;
+      let timeoutId;
+      let finishedLoading = false;
 
       const animate = () => {
+          if (finishedLoading) {
+              progressBar.style.width = '100%';
+              progressBar.style.transition = 'width 0.3s ease-out'; // Transition de fin
+              return;
+          }
+
           const elapsed = Date.now() - startTime;
-          const progress = Math.min(elapsed / MIN_LOAD_TIME_MS, 1);
+          const progress = Math.min(elapsed / MIN_LOAD_TIME_MS, 0.95);
 
           progressBar.style.width = `${progress * 100}%`;
 
-          if (progress < 1) {
-              animationFrameId = requestAnimationFrame(animate);
-          }
+          animationFrameId = requestAnimationFrame(animate);
       };
 
       animationFrameId = requestAnimationFrame(animate);
 
+      timeoutId = setTimeout(() => {
+          if (!finishedLoading) {
+              progressBar.style.width = '95%';
+          }
+      }, MIN_LOAD_TIME_MS);
+
       progressAnimations[tabName] = {
           animationFrame: animationFrameId,
+          timeoutId: timeoutId,
           progressBar: progressBar,
-          startTime: startTime
+          markFinished: () => { finishedLoading = true; }
       };
   }
 
+  // Votre fonction finishProgressBarAnimation devrait toujours être celle-ci :
   function finishProgressBarAnimation(buttonElement, tabName) {
       if (progressAnimations[tabName]) {
-          const { progressBar, animationFrame } = progressAnimations[tabName];
+          const { progressBar, animationFrame, timeoutId, markFinished } = progressAnimations[tabName];
 
-          // Annuler l'animation en cours
-          cancelAnimationFrame(animationFrame);
-
-          // Forcer la barre à 100% avec une transition douce
-          progressBar.style.transition = 'width 0.3s ease-out';
+          markFinished();
           progressBar.style.width = '100%';
+          progressBar.style.transition = 'width 0.3s ease-out';
 
-          // Réinitialiser après un court délai
           setTimeout(() => {
               progressBar.style.width = '0%';
-              progressBar.style.transition = 'none';
+              progressBar.style.removeProperty('transition'); // Cette ligne est cruciale aussi !
           }, 300);
 
+          cancelAnimationFrame(animationFrame);
+          clearTimeout(timeoutId);
           delete progressAnimations[tabName];
       }
   }
