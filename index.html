@@ -1361,8 +1361,21 @@
                           // Choisissez l'emplacement qui vous convient le mieux.
     }
 
-    // 👇 expose la fonction pour la réutiliser ailleurs
-    window.refreshNotesTab = buildNotesTab;
+    // Version modifiée de refreshNotesTab pour gérer l'animation
+    window.refreshNotesTab = function() {
+      return new Promise((resolve) => {
+        // Démarrer l'animation avant l'exécution
+        requestAnimationFrame(() => {
+          // Exécuter la fonction synchrone
+          buildNotesTab();
+
+          // Forcer un délai minimal pour que l'animation soit visible
+          setTimeout(() => {
+            resolve();
+          }, 300); // 300ms délai minimal pour l'animation
+        });
+      });
+    };
 
     // 👇 première construction immédiate de l'onglet Notes
     buildNotesTab();
