@@ -1611,17 +1611,24 @@
   }
 
   function showTab(tabName) {
-    // Masquer tous les contenus et retirer la classe 'active' des boutons
+    // Masquer tous les contenus
     document.querySelectorAll('.tab-content').forEach(tab => {
       tab.classList.add('hidden');
     });
+
+    // Trouver le bouton cliqué pour l'activer et démarrer la barre
+    const clickedBtn = Array.from(document.querySelectorAll('.tab-btn')).find(btn =>
+      btn.textContent.toLowerCase().includes(tabName)
+    );
+
+    // Retirer la classe 'active' de TOUS les boutons et réinitialiser leur barre,
+    // SAUF pour le bouton qui vient d'être cliqué (car on va l'activer et animer sa barre)
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.classList.remove('active');
-      // Réinitialiser la barre de progression des autres boutons au cas où
       const progressBar = btn.querySelector('.progress-bar');
-      if (progressBar) {
+      if (progressBar && btn !== clickedBtn) { // <--- ATTENTION : AJOUT DE LA CONDITION `btn !== clickedBtn` ICI
           progressBar.style.width = '0%';
-          progressBar.style.transition = 'none'; // Pas d'animation lors de la réinitialisation
+          progressBar.style.transition = 'none'; // Seulement pour les boutons non actifs
       }
     });
 
@@ -1629,46 +1636,26 @@
     const targetTabContent = document.getElementById(`tab-${tabName}`);
     targetTabContent.classList.remove('hidden');
 
-    // Ajouter la classe 'active' au bouton cliqué
-    const clickedBtn = Array.from(document.querySelectorAll('.tab-btn')).find(btn =>
-      btn.textContent.toLowerCase().includes(tabName)
-    );
-
-    // --- DÉBUT DES MODIFICATIONS POUR LA BARRE DE PROGRÈS ---
+    // Ajouter la classe 'active' au bouton cliqué et démarrer l'animation
     if (clickedBtn) {
-      // Stocker le nom de l'onglet sur le bouton lui-même pour un accès facile
+      clickedBtn.classList.add('active');
       clickedBtn.dataset.tabName = tabName;
-      // Démarrer l'animation de la barre de progression pour le bouton cliqué
-      startProgressBarAnimation(clickedBtn, tabName);
+      startProgressBarAnimation(clickedBtn, tabName); // Démarrer l'animation
     }
 
     // Gérer le chargement du contenu de l'onglet
-    // Ces fonctions (refreshNotesTab, etc.) sont ce qui prend du temps.
-    // Nous appellerons finishProgressBarAnimation après leur exécution.
     if (tabName === "notes") {
       if (typeof window.refreshNotesTab === "function") {
-        // Exécutez la logique de chargement réelle ici
         window.refreshNotesTab();
-        // Une fois le contenu chargé, terminez l'animation de la barre
         finishProgressBarAnimation(clickedBtn, tabName);
       } else {
         console.warn("ShowTab: window.refreshNotesTab n'est pas une fonction.");
-        // Si la fonction n'existe pas, terminer l'animation quand même.
         if (clickedBtn) finishProgressBarAnimation(clickedBtn, tabName);
       }
-    } else if (tabName === "bookmarks") {
-      // NOTE IMPORTANTE : Actuellement, le rendu de "bookmarks" se fait une fois dans loadPreviewData.
-      // Si vous voulez une barre de progression à chaque clic, vous devrez
-      // créer une fonction `buildBookmarksTab()` qui recrée le contenu,
-      // et l'appeler ici. Pour l'instant, on simule une fin immédiate.
-      console.log(`ShowTab: Onglet ${tabName} sélectionné. Le contenu est supposé être déjà généré.`);
-      if (clickedBtn) finishProgressBarAnimation(clickedBtn, tabName);
-    } else if (tabName === "tags") {
-      // Idem pour "tags". Si `buildTagsTab()` n'existe pas encore, le contenu est déjà là.
+    } else if (tabName === "bookmarks" || tabName === "tags") {
       console.log(`ShowTab: Onglet ${tabName} sélectionné. Le contenu est supposé être déjà généré.`);
       if (clickedBtn) finishProgressBarAnimation(clickedBtn, tabName);
     }
-    // --- FIN DES MODIFICATIONS POUR LA BARRE DE PROGRÈS ---
   }
 
   document.addEventListener("click", function (e) {
