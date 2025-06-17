@@ -1129,9 +1129,11 @@
       const progressBar = buttonElement.querySelector('.progress-bar');
       if (!progressBar) return;
 
-      progressBar.style.removeProperty('width');
-      progressBar.style.removeProperty('transition');
+      // Réinitialiser la barre
+      progressBar.style.width = '0%';
+      progressBar.style.transition = 'width 0.1s linear';
 
+      // Annimer toute animation existante
       if (progressAnimations[tabName]) {
           cancelAnimationFrame(progressAnimations[tabName].animationFrame);
           clearTimeout(progressAnimations[tabName].timeoutId);
@@ -1139,55 +1141,44 @@
 
       const startTime = Date.now();
       let animationFrameId;
-      let timeoutId;
-      let finishedLoading = false;
 
       const animate = () => {
-          if (finishedLoading) {
-              progressBar.style.width = '100%';
-              progressBar.style.transition = 'width 0.3s ease-out';
-              return;
-          }
-
           const elapsed = Date.now() - startTime;
-          let progress = Math.min(elapsed / MIN_LOAD_TIME_MS, 0.95);
+          const progress = Math.min(elapsed / MIN_LOAD_TIME_MS, 1);
 
           progressBar.style.width = `${progress * 100}%`;
 
-          animationFrameId = requestAnimationFrame(animate);
+          if (progress < 1) {
+              animationFrameId = requestAnimationFrame(animate);
+          }
       };
 
       animationFrameId = requestAnimationFrame(animate);
 
-      timeoutId = setTimeout(() => {
-          if (!finishedLoading) {
-              progressBar.style.width = '95%';
-          }
-      }, MIN_LOAD_TIME_MS);
-
       progressAnimations[tabName] = {
           animationFrame: animationFrameId,
-          timeoutId: timeoutId,
           progressBar: progressBar,
-          markFinished: () => { finishedLoading = true; }
+          startTime: startTime
       };
   }
 
   function finishProgressBarAnimation(buttonElement, tabName) {
       if (progressAnimations[tabName]) {
-          const { progressBar, animationFrame, timeoutId, markFinished } = progressAnimations[tabName];
+          const { progressBar, animationFrame } = progressAnimations[tabName];
 
-          markFinished();
-          progressBar.style.width = '100%';
+          // Annuler l'animation en cours
+          cancelAnimationFrame(animationFrame);
+
+          // Forcer la barre à 100% avec une transition douce
           progressBar.style.transition = 'width 0.3s ease-out';
+          progressBar.style.width = '100%';
 
+          // Réinitialiser après un court délai
           setTimeout(() => {
               progressBar.style.width = '0%';
-              progressBar.style.removeProperty('transition');
+              progressBar.style.transition = 'none';
           }, 300);
 
-          cancelAnimationFrame(animationFrame);
-          clearTimeout(timeoutId);
           delete progressAnimations[tabName];
       }
   }
@@ -1584,51 +1575,65 @@
     doc.save('notes.pdf');
   }
 
-  function showTab(tabName) {
+  async function showTab(tabName) {
     // Masquer tous les contenus
     document.querySelectorAll('.tab-content').forEach(tab => {
-      tab.classList.add('hidden');
+        tab.classList.add('hidden');
     });
 
-    // Trouver le bouton cliqué pour l'activer et démarrer la barre
+    // Trouver le bouton cliqué
     const clickedBtn = Array.from(document.querySelectorAll('.tab-btn')).find(btn =>
-      btn.textContent.toLowerCase().includes(tabName)
+        btn.textContent.toLowerCase().includes(tabName)
     );
 
-    // Retirer la classe 'active' de TOUS les boutons et réinitialiser leur barre,
-    // SAUF pour le bouton qui vient d'être cliqué (car on va l'activer et animer sa barre)
+    // Réinitialiser tous les boutons sauf celui cliqué
     document.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.classList.remove('active');
-      const progressBar = btn.querySelector('.progress-bar');
-      if (progressBar && btn !== clickedBtn) { // <--- ATTENTION : AJOUT DE LA CONDITION `btn !== clickedBtn` ICI
-          progressBar.style.width = '0%';
-          progressBar.style.transition = 'none'; // Seulement pour les boutons non actifs
-      }
+        btn.classList.remove('active');
+        const progressBar = btn.querySelector('.progress-bar');
+        if (progressBar && btn !== clickedBtn) {
+            progressBar.style.width = '0%';
+            progressBar.style.transition = 'none';
+        }
     });
 
-    // Afficher le contenu sélectionné
-    const targetTabContent = document.getElementById(`tab-${tabName}`);
-    targetTabContent.classList.remove('hidden');
-
-    // Ajouter la classe 'active' au bouton cliqué et démarrer l'animation
+    // Activer le bouton cliqué et démarrer la barre
     if (clickedBtn) {
-      clickedBtn.classList.add('active');
-      clickedBtn.dataset.tabName = tabName;
-      startProgressBarAnimation(clickedBtn, tabName); // Démarrer l'animation
+        clickedBtn.classList.add('active');
+        clickedBtn.dataset.tabName = tabName;
+        startProgressBarAnimation(clickedBtn, tabName);
     }
 
-    // Gérer le chargement du contenu de l'onglet
-    if (tabName === "notes") {
-      if (typeof window.refreshNotesTab === "function") {
-        window.refreshNotesTab();
-        finishProgressBarAnimation(clickedBtn, tabName);
-      } else {
-        console.warn("ShowTab: window.refreshNotesTab n'est pas une fonction.");
-        if (clickedBtn) finishProgressBarAnimation(clickedBtn, tabName);
-      }
-    } else if (tabName === "bookmarks" || tabName === "tags") {
-      console.log(`ShowTab: Onglet ${tabName} sélectionné. Le contenu est supposé être déjà généré.`);
-      if (clickedBtn) finishProgressBarAnimation(clickedBtn, tabName);
+    // Afficher le contenu cible
+    const targetTabContent = document.getElementById(`tab-${tabName}`);
+    if (targetTabContent) {
+        targetTabContent.classList.remove('hidden');
+    }
+
+    try {
+        // Gérer le chargement spécifique à chaque onglet
+        switch (tabName) {
+            case "notes":
+                if (typeof window.refreshNotesTab === "function") {
+                    await window.refreshNotesTab(); // Attendre la fin du chargement
+                } else {
+                    console.warn("ShowTab: window.refreshNotesTab n'est pas une fonction.");
+                }
+                break;
+
+            case "bookmarks":
+            case "tags":
+                console.log(`ShowTab: Onglet ${tabName} sélectionné.`);
+                // Simuler un temps de chargement minimal
+                await new Promise(resolve => setTimeout(resolve, 500));
+                break;
+        }
+    } catch (error) {
+        console.error("Erreur lors du chargement de l'onglet:", error);
+    } finally {
+        // Terminer l'animation une fois tout le chargement terminé
+        if (clickedBtn) {
+            finishProgressBarAnimation(clickedBtn, tabName);
+        }
     }
   }
 
