@@ -1157,23 +1157,6 @@
       const maxLength = Math.max(contents.file1.length, contents.file2.length);
       const tabEl = document.getElementById("tab-notes");
 
-      // Sauvegarder les tags sélectionnés avant de reconstruire
-      document.querySelectorAll(".note-tags-select").forEach(select => {
-        const index = select.dataset.index;
-        const catIndex = parseInt(select.dataset.catIndex);
-        const tagId = parseInt(select.value);
-
-        if (!currentTagSelections[index]) {
-          currentTagSelections[index] = ["", "", "", "", ""];
-        }
-
-        if (!isNaN(catIndex)) {
-          currentTagSelections[index][catIndex] = isNaN(tagId) ? "" : tagId;
-        }
-      });
-
-
-
       tabEl.innerHTML = `
         <table style="width: 100%; border-collapse: collapse;">
           <thead>
@@ -1213,7 +1196,61 @@
           </tbody>
         </table>
       `;
+      // ✨ ATTACHER LES ÉCOUTEURS APRÈS QUE LE HTML A ÉTÉ INSÉRÉ DANS LE DOM ✨
+      // Pour les champs de texte éditables (Content des notes)
+      tabEl.querySelectorAll(".editable").forEach((el) => { // Utilisez tabEl.querySelectorAll
+        el.addEventListener("input", (e) => {
+          const { table, file, index, field } = e.target.dataset;
+          if (
+            previewDataEdited[table] &&
+            previewDataEdited[table][file] &&
+            previewDataEdited[table][file][index]
+          ) {
+            previewDataEdited[table][file][index][field] = e.target.value;
+          }
+        });
+      });
+
+      // Pour les sélecteurs de tags des notes
+      tabEl.querySelectorAll(".note-tags-select").forEach((el) => { // Utilisez tabEl.querySelectorAll
+        el.addEventListener("change", (e) => {
+          const { table, file, index, catIndex } = e.target.dataset;
+          const newTagId = parseInt(e.target.value);
+
+          if (
+            !previewDataEdited[table] ||
+            !previewDataEdited[table][file] ||
+            !previewDataEdited[table][file][index]
+          ) {
+            return;
+          }
+
+          const note = previewDataEdited[table][file][index];
+          if (!Array.isArray(note.TagIds)) {
+            note.TagIds = [];
+          }
+          note.TagIds[catIndex] = isNaN(newTagId) ? null : newTagId;
+          const cleanedTagIds = note.TagIds.filter(id => id !== null && id !== undefined && !isNaN(id));
+          note.TagIds = [...new Set(cleanedTagIds)];
+
+          console.log(`Note ${index}, ${file}, Tag sur position ${catIndex} mis à jour.`);
+          console.log(`Nouveaux TagIds pour cette note:`, note.TagIds);
+        });
+      });
     }
+    const existingPdfBtn = document.getElementById("exportPdfBtn");
+    if (existingPdfBtn) {
+        existingPdfBtn.remove(); // Supprimer l'ancien si la fonction est appelée plusieurs fois
+    }
+    const btn = document.createElement("button");
+    btn.id = "exportPdfBtn";
+    btn.textContent = "🖨️ Imprimer Notes en PDF";
+    btn.style.margin = "10px 0";
+    btn.onclick = exportNotesToPdf;
+    tabEl.prepend(btn); // Ou tabEl.appendChild(btn) si vous voulez qu'il soit après le tableau.
+                        // prepend le met en haut, appendChild le met en bas.
+                        // Choisissez l'emplacement qui vous convient le mieux.
+
 
     // 👇 expose la fonction pour la réutiliser ailleurs
     window.refreshNotesTab = buildNotesTab;
@@ -1272,19 +1309,6 @@
         </table>
       `;
     }
-
-    document.querySelectorAll(".editable").forEach((el) => {
-      el.addEventListener("input", (e) => {
-        const { table, file, index, field } = e.target.dataset;
-        if (
-          previewDataEdited[table] &&
-          previewDataEdited[table][file] &&
-          previewDataEdited[table][file][index]
-        ) {
-          previewDataEdited[table][file][index][field] = e.target.value;
-        }
-      });
-    });
   }
 
   function showFullNote(content) {
@@ -1446,16 +1470,6 @@
 
     // Si onglet NOTES : ajouter bouton PDF + rafraîchir les catégories
     if (tabName === "notes") {
-      // Ajouter bouton PDF si non présent
-      if (!document.getElementById("exportPdfBtn")) {
-        const btn = document.createElement("button");
-        btn.id = "exportPdfBtn";
-        btn.textContent = "🖨️ Imprimer Notes en PDF";
-        btn.style.margin = "10px 0";
-        btn.onclick = exportNotesToPdf;
-        document.getElementById("tab-notes").prepend(btn);
-      }
-
       // Appeler refreshNotesTab() si elle est définie
       if (typeof window.refreshNotesTab === "function") {
         window.refreshNotesTab();
@@ -1471,55 +1485,6 @@
       const label = e.target.getAttribute("data-label");
       showFullNote(content, label);
     }
-  });
-
-  // ──────────────────────────────────────────────────────────────────────────────
-  // ÉCOUTEUR POUR LE MENU DEROULANT DE CATÉGORIE (class="note-tags-select")
-  // ──────────────────────────────────────────────────────────────────────────────
-  document.addEventListener("change", function (e) {
-    if (!e.target.classList.contains("note-tags-select")) return;
-
-    const table   = e.target.dataset.table;   // "notes"
-    const fileKey = e.target.dataset.file;    // "file1" ou "file2"
-    const index   = parseInt(e.target.dataset.index, 10);
-    const newTagId = parseInt(e.target.value, 10);
-
-    // Récupérer le NoteId
-    const noteObj = previewDataEdited.notes[fileKey]?.[index];
-    if (!noteObj || noteObj.NoteId == null) return;
-    const noteId = noteObj.NoteId;
-
-    // Supprimer éventuelle entrée précédente pour libérer la Position
-    const existing = previewDataEdited.tagMaps[fileKey][index];
-    if (existing) {
-      delete previewDataEdited.tagMaps[fileKey][index];
-    }
-
-    // Construire ensemble des positions déjà utilisées pour ce TagId
-    const usedPositions = new Set();
-    ["file1", "file2"].forEach(fk => {
-      Object.values(previewDataEdited.tagMaps[fk]).forEach(entry => {
-        if (entry.TagId === newTagId) {
-          usedPositions.add(entry.Position);
-        }
-      });
-    });
-
-    // Chercher la plus petite Position libre
-    let freePos = 0;
-    while (usedPositions.has(freePos)) {
-      freePos++;
-    }
-
-    // Mettre à jour previewDataEdited.tagMaps
-    previewDataEdited.tagMaps[fileKey][index] = {
-      NoteId: noteId,
-      TagId: newTagId,
-      Position: freePos
-    };
-
-    // Mettre à jour aussi previewDataEdited.notes avec le nouveau TagId
-    previewDataEdited.notes[fileKey][index].TagId = newTagId;
   });
 
   function renderNotesPreview(data) {
