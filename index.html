@@ -1136,6 +1136,7 @@
 
       // Réinitialiser la barre pour une nouvelle animation
       progressBar.style.width = '0%';
+      progressBar.style.removeProperty('transition');
       progressBar.style.transition = 'width 0.1s linear'; // Transition rapide pour le démarrage
 
       // Annuler toute animation précédente pour cet onglet, si elle existait
@@ -1207,7 +1208,6 @@
           // Après la transition finale, cacher/réinitialiser la barre
           setTimeout(() => {
               progressBar.style.width = '0%'; // Réinitialiser la largeur
-              progressBar.style.transition = 'none'; // Supprimer la transition pour éviter un flash
               // On peut aussi la rendre invisible si on veut : progressBar.style.opacity = '0';
           }, 300); // 300ms correspond à la durée de la transition '0.3s ease-out'
 
