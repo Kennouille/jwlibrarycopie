@@ -363,11 +363,44 @@
       width: 100%;
       transition: 0.3s;
       margin-bottom: 10px;
+
+      /* NOUVEAU POUR LA BARRE DE PROGRÈS */
+      position: relative; /* Pour positionner la barre à l'intérieur */
+      overflow: hidden;   /* Pour cacher ce qui dépasse de la barre */
+      display: flex;      /* Pour centrer le texte et la barre si besoin */
+      align-items: center;
+      justify-content: center;
+      padding: 0; /* Réinitialiser le padding pour le gérer sur le span du texte */
     }
 
+    .tab-btn .tab-text {
+      position: relative; /* Pour s'assurer que le texte est au-dessus de la barre */
+      z-index: 2;         /* Assure que le texte est visible au-dessus de la barre */
+      padding: 12px 24px; /* Remettre le padding sur le texte */
+      width: 100%;        /* Pour que le texte occupe toute la largeur disponible */
+      text-align: center; /* Centrer le texte */
+    }
+
+    .tab-btn .progress-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 0%; /* Largeur initiale */
+      background-color: rgba(0, 123, 255, 0.3); /* Couleur de la barre, légèrement transparente */
+      transition: width 0.1s linear; /* Animation douce de la largeur */
+      z-index: 1; /* S'assure que la barre est en arrière-plan par rapport au texte */
+    }
+
+    /* Style de la barre pour le bouton actif */
     .tab-btn.active {
       background-color: #007bff;
       color: white;
+    }
+
+    /* Ajustement de la couleur de la barre pour le bouton actif */
+    .tab-btn.active .progress-bar {
+      background-color: rgba(255, 255, 255, 0.3); /* Barre plus claire sur fond bleu */
     }
 
     .tab-content {
@@ -652,9 +685,18 @@
   <h3>Prévisualisation et Choix Utilisateur</h3>
 
   <div class="tabs">
-    <button class="tab-btn" onclick="showTab('notes')">📝 Notes</button>
-    <button class="tab-btn" onclick="showTab('bookmarks')">🔖 Marque-pages</button>
-    <button class="tab-btn" onclick="showTab('tags')">🏷️ Catégories</button>
+    <button class="tab-btn" onclick="showTab('notes')">
+      <span class="tab-text">📝 Notes</span>
+      <span class="progress-bar"></span>
+    </button>
+    <button class="tab-btn" onclick="showTab('bookmarks')">
+      <span class="tab-text">🔖 Marque-pages</span>
+      <span class="progress-bar"></span>
+    </button>
+    <button class="tab-btn" onclick="showTab('tags')">
+      <span class="tab-text">🏷️ Catégories</span>
+      <span class="progress-bar"></span>
+    </button>
   </div>
 
   <div style="margin-top: 30px; text-align: center;">
@@ -1076,6 +1118,103 @@
     return `<div><strong>${labels[field]} :</strong><br>
       <input type="text" class="editable" id="${id}" data-table="${table}" data-file="${fileKey}" data-index="${index}" data-field="${field}" value="${escaped}" style="width:100%;">
     </div>`;
+  }
+
+  // Variables pour gérer les animations de barre de progression
+  const progressAnimations = {}; // Pour stocker les identifiants d'animation par onglet
+  const MIN_LOAD_TIME_MS = 3000; // Durée minimale de l'animation en millisecondes (3 secondes pour le test, on passera à 30000ms plus tard)
+
+  /**
+   * Démarre l'animation de la barre de progression pour un bouton d'onglet donné.
+   * @param {HTMLElement} buttonElement Le bouton d'onglet (l'élément <button>).
+   * @param {string} tabName Le nom de l'onglet (ex: 'notes', 'bookmarks', 'tags').
+   */
+  function startProgressBarAnimation(buttonElement, tabName) {
+      const progressBar = buttonElement.querySelector('.progress-bar');
+      if (!progressBar) return; // S'il n'y a pas de barre de progression, on ne fait rien
+
+      // Réinitialiser la barre pour une nouvelle animation
+      progressBar.style.width = '0%';
+      progressBar.style.transition = 'width 0.1s linear'; // Transition rapide pour le démarrage
+
+      // Annuler toute animation précédente pour cet onglet, si elle existait
+      if (progressAnimations[tabName]) {
+          cancelAnimationFrame(progressAnimations[tabName].animationFrame);
+          clearTimeout(progressAnimations[tabName].timeoutId);
+      }
+
+      const startTime = Date.now(); // Temps de début de l'animation
+      let animationFrameId; // Pour stocker l'ID de requestAnimationFrame
+      let timeoutId;        // Pour stocker l'ID de setTimeout
+      let finishedLoading = false; // Drapeau pour indiquer si le vrai chargement est terminé
+
+      // Fonction d'animation appelée à chaque frame
+      const animate = () => {
+          if (finishedLoading) {
+              // Si le vrai chargement est terminé, on fait avancer la barre à 100% rapidement
+              progressBar.style.width = '100%';
+              progressBar.style.transition = 'width 0.3s ease-out'; // Transition douce pour la fin
+              // La barre sera masquée par finishProgressBarAnimation un peu après
+              return;
+          }
+
+          const elapsed = Date.now() - startTime;
+          // Calcule la progression, ne dépasse pas 95% pour indiquer que ce n'est pas encore "terminé"
+          let progress = Math.min(elapsed / MIN_LOAD_TIME_MS, 0.95);
+
+          progressBar.style.width = `${progress * 100}%`;
+
+          animationFrameId = requestAnimationFrame(animate); // Demande la prochaine frame
+      };
+
+      // Démarrer l'animation
+      animationFrameId = requestAnimationFrame(animate);
+
+      // Définir un timeout pour s'assurer que la barre progresse même si requestAnimationFrame est lent
+      // Cela garantit qu'elle atteindra au moins 95% si le chargement réel est plus long que MIN_LOAD_TIME_MS
+      timeoutId = setTimeout(() => {
+          if (!finishedLoading) {
+              progressBar.style.width = '95%';
+              progressBar.style.transition = `width ${MIN_LOAD_TIME_MS / 1000 * 0.05}s ease-out`; // Ralentir la transition finale vers 95%
+          }
+      }, MIN_LOAD_TIME_MS);
+
+      // Stocker les IDs pour pouvoir les arrêter plus tard
+      progressAnimations[tabName] = {
+          animationFrame: animationFrameId,
+          timeoutId: timeoutId,
+          progressBar: progressBar,
+          markFinished: () => { finishedLoading = true; } // Méthode pour signaler la fin du vrai chargement
+      };
+  }
+
+  /**
+   * Termine l'animation de la barre de progression et la réinitialise.
+   * @param {HTMLElement} buttonElement Le bouton d'onglet.
+   * @param {string} tabName Le nom de l'onglet.
+   */
+  function finishProgressBarAnimation(buttonElement, tabName) {
+      if (progressAnimations[tabName]) {
+          const { progressBar, animationFrame, timeoutId, markFinished } = progressAnimations[tabName];
+
+          markFinished(); // Signale à la fonction 'animate' que le chargement réel est terminé
+
+          // Assurer que la barre atteint 100% rapidement
+          progressBar.style.width = '100%';
+          progressBar.style.transition = 'width 0.3s ease-out'; // Transition finale rapide et douce
+
+          // Après la transition finale, cacher/réinitialiser la barre
+          setTimeout(() => {
+              progressBar.style.width = '0%'; // Réinitialiser la largeur
+              progressBar.style.transition = 'none'; // Supprimer la transition pour éviter un flash
+              // On peut aussi la rendre invisible si on veut : progressBar.style.opacity = '0';
+          }, 300); // 300ms correspond à la durée de la transition '0.3s ease-out'
+
+          // Nettoyer les ressources de l'animation
+          cancelAnimationFrame(animationFrame);
+          clearTimeout(timeoutId);
+          delete progressAnimations[tabName]; // Supprimer la référence de l'objet
+      }
   }
 
   function loadPreviewData(previewData) {
