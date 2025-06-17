@@ -1237,20 +1237,20 @@
           console.log(`Nouveaux TagIds pour cette note:`, note.TagIds);
         });
       });
-    }
-    const existingPdfBtn = document.getElementById("exportPdfBtn");
-    if (existingPdfBtn) {
-        existingPdfBtn.remove(); // Supprimer l'ancien si la fonction est appelée plusieurs fois
-    }
-    const btn = document.createElement("button");
-    btn.id = "exportPdfBtn";
-    btn.textContent = "🖨️ Imprimer Notes en PDF";
-    btn.style.margin = "10px 0";
-    btn.onclick = exportNotesToPdf;
-    tabEl.prepend(btn); // Ou tabEl.appendChild(btn) si vous voulez qu'il soit après le tableau.
-                        // prepend le met en haut, appendChild le met en bas.
-                        // Choisissez l'emplacement qui vous convient le mieux.
 
+      const existingPdfBtn = document.getElementById("exportPdfBtn");
+      if (existingPdfBtn) {
+          existingPdfBtn.remove(); // Supprimer l'ancien si la fonction est appelée plusieurs fois
+      }
+      const btn = document.createElement("button");
+      btn.id = "exportPdfBtn";
+      btn.textContent = "🖨️ Imprimer Notes en PDF";
+      btn.style.margin = "10px 0";
+      btn.onclick = exportNotesToPdf;
+      tabEl.prepend(btn); // Ou tabEl.appendChild(btn) si vous voulez qu'il soit après le tableau.
+                          // prepend le met en haut, appendChild le met en bas.
+                          // Choisissez l'emplacement qui vous convient le mieux.
+    }
 
     // 👇 expose la fonction pour la réutiliser ailleurs
     window.refreshNotesTab = buildNotesTab;
