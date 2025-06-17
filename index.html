@@ -1312,6 +1312,24 @@
           </tbody>
         </table>
       `;
+      tabEl.querySelectorAll(".editable").forEach((el) => {
+        el.addEventListener("input", (e) => {
+          const { table, file, index, field } = e.target.dataset;
+          if (
+            previewDataEdited[table] &&
+            previewDataEdited[table][file] &&
+            previewDataEdited[table][file][index]
+          ) {
+            previewDataEdited[table][file][index][field] = e.target.value;
+            // Logs pour vérifier la mise à jour des tags
+            console.log(`[EDITABLE INPUT - OTHER TABS] Table: ${table}, File: ${file}, Index: ${index}, Field: ${field}, New Value:`, previewDataEdited[table][file][index][field]);
+            if (table === "tags") {
+              console.log(`[EDITABLE INPUT - OTHER TABS] État actuel de previewDataEdited.tags.file1:`, previewDataEdited.tags.file1);
+              console.log(`[EDITABLE INPUT - OTHER TABS] État actuel de previewDataEdited.tags.file2:`, previewDataEdited.tags.file2);
+            }
+          }
+        });
+      });
     }
   }
 
