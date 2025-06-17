@@ -1361,19 +1361,27 @@
                           // Choisissez l'emplacement qui vous convient le mieux.
     }
 
-    // Version modifiée de refreshNotesTab pour gérer l'animation
+    // Variable pour s'assurer que MIN_LOAD_TIME_MS peut être géré de manière globale
+    const MIN_LOAD_TIME_MS = 3000; // Ou 30000 si c'est la durée réelle
+
     window.refreshNotesTab = function() {
       return new Promise((resolve) => {
-        // Démarrer l'animation avant l'exécution
-        requestAnimationFrame(() => {
-          // Exécuter la fonction synchrone
-          buildNotesTab();
+        const startBuildTime = Date.now(); // Temps de début de buildNotesTab
 
-          // Forcer un délai minimal pour que l'animation soit visible
+        buildNotesTab(); // Exécuter la fonction qui prend du temps
+
+        const elapsedBuildTime = Date.now() - startBuildTime;
+        // Si le temps de construction est inférieur au temps minimum désiré pour l'animation,
+        // on attend le reste du temps. Sinon, on résout immédiatement.
+        const remainingTime = MIN_LOAD_TIME_MS - elapsedBuildTime;
+
+        if (remainingTime > 0) {
           setTimeout(() => {
-            resolve();
-          }, 300); // 300ms délai minimal pour l'animation
-        });
+            resolve(); // Résoudre la promesse après le délai minimum
+          }, remainingTime);
+        } else {
+          resolve(); // Résoudre la promesse immédiatement si le build a pris plus de temps que le minimum
+        }
       });
     };
 
