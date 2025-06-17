@@ -1152,6 +1152,7 @@
     // Fonction réutilisable pour générer l’onglet Notes
     // ──────────────────────────────────────────────────────────────────────────────
     function buildNotesTab() {
+      console.log("buildNotesTab: Démarrage de la reconstruction de l'onglet Notes.");
       const contents = previewDataEdited.notes;
       const fieldsToKeep = ["Title", "Content"];
       const maxLength = Math.max(contents.file1.length, contents.file2.length);
@@ -1207,6 +1208,9 @@
             previewDataEdited[table][file][index]
           ) {
             previewDataEdited[table][file][index][field] = e.target.value;
+            console.log(`[EDITABLE INPUT] Table: ${table}, File: ${file}, Index: ${index}, Field: ${field}, New Value:`, previewDataEdited[table][file][index][field]);
+            console.log(`[EDITABLE INPUT] État actuel de previewDataEdited.tags.file1:`, previewDataEdited.tags.file1);
+            console.log(`[EDITABLE INPUT] État actuel de previewDataEdited.tags.file2:`, previewDataEdited.tags.file2);
           }
         });
       });
@@ -1470,13 +1474,17 @@
 
     // Si onglet NOTES : ajouter bouton PDF + rafraîchir les catégories
     if (tabName === "notes") {
-      // Appeler refreshNotesTab() si elle est définie
+      console.log("ShowTab: Tentative de rafraîchissement de l'onglet Notes."); // LOG 1
       if (typeof window.refreshNotesTab === "function") {
         window.refreshNotesTab();
+      } else {
+        console.warn("ShowTab: window.refreshNotesTab n'est pas une fonction."); // LOG 2
       }
     }
+    else {
+        console.log(`ShowTab: Onglet ${tabName} sélectionné.`); // LOG 3 (pour les autres onglets)
+    }
   }
-
 
   document.addEventListener("click", function (e) {
     if (e.target.classList.contains("show-full-note")) {
