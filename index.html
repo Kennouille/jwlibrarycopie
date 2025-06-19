@@ -851,6 +851,9 @@
   const currentTagSelections = {};
 
   let currentProgress = 0;
+  let cachedNotesTabHTML = null; // Variable pour stocker le HTML de l'onglet Notes
+  let notesDataHash = null;      // Pour stocker un "hash" ou une représentation de l'état actuel des données de notes
+                               // afin de savoir si les données ont changé.
 
    async function updateProgress(targetPercent, message, step) {
     return new Promise(resolve => {
@@ -1266,6 +1269,12 @@
       }
   }
 
+  function invalidateNotesCache() {
+    cachedNotesTabHTML = null;
+    notesDataHash = null;
+    console.log("Cache de l'onglet Notes invalidé.");
+  }
+
   function loadPreviewData(previewData) {
     document.getElementById("preview-section").classList.remove("hidden");
     previewDataEdited = JSON.parse(JSON.stringify(previewData)); // Copie indépendante
@@ -1341,228 +1350,174 @@
     // ──────────────────────────────────────────────────────────────────────────────
     function buildNotesTab() {
       console.log("buildNotesTab: Démarrage de la reconstruction de l'onglet Notes.");
+      const tabEl = document.getElementById("tab-notes");
+
+      // Calculer un hash simple des données des notes
+      // C'est une méthode simple pour détecter si les données ont changé.
+      // Une méthode plus robuste serait de hacher un JSON.stringify(previewDataEdited.notes)
+      // mais ça peut aussi être coûteux. Pour l'instant, on fait simple.
+      const currentNotesDataState = JSON.stringify(previewDataEdited.notes);
+
+      // Si le HTML est en cache ET que les données n'ont pas changé, utilisez le cache
+      if (cachedNotesTabHTML && notesDataHash === currentNotesDataState) {
+          console.log("buildNotesTab: Chargement de l'onglet Notes depuis le cache.");
+          tabEl.innerHTML = cachedNotesTabHTML;
+          // Important : Ré-initialiser Tom Select et les autres écouteurs même si c'est depuis le cache !
+          // Car les éléments DOM ont été recréés par innerHTML
+          initializeNoteElements(); // Nouvelle fonction pour regrouper les initialisations
+          return; // Sortir de la fonction
+      }
+
+      console.log("buildNotesTab: Génération complète de l'onglet Notes.");
+      // --- Votre code existant pour générer le HTML ---
       const contents = previewDataEdited.notes;
       const fieldsToKeep = ["Title", "Content"];
       const maxLength = Math.max(contents.file1.length, contents.file2.length);
-      const tabEl = document.getElementById("tab-notes");
 
-      tabEl.innerHTML = `
-        <table style="width: 100%; border-collapse: collapse;">
-          <thead>
-            <tr style="background-color: #f0f0f0;">
-              <th style="width: 33%; padding: 8px;">📂 Fichier 1</th>
-              <th style="width: 33%; padding: 8px;">📂 Fichier 2</th>
-              <th style="width: 34%; padding: 8px;">✅ Choix</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${Array.from({ length: maxLength }).map((_, index) => {
-              const item1 = contents.file1[index] || {};
-              const item2 = contents.file2[index] || {};
+      const generatedHTML = `
+          <table style="width: 100%; border-collapse: collapse;">
+              <thead>
+                  <tr style="background-color: #f0f0f0;">
+                      <th style="width: 33%; padding: 8px;">📂 Fichier 1</th>
+                      <th style="width: 33%; padding: 8px;">📂 Fichier 2</th>
+                      <th style="width: 34%; padding: 8px;">✅ Choix</th>
+                  </tr>
+              </thead>
+              <tbody>
+                  ${Array.from({ length: maxLength }).map((_, index) => {
+                      const item1 = contents.file1[index] || {};
+                      const item2 = contents.file2[index] || {};
 
-              const html1 = fieldsToKeep.map(field =>
-                renderEditableField("notes", "file1", index, field, item1[field], labels)
-              ).join("");
+                      const html1 = fieldsToKeep.map(field =>
+                          renderEditableField("notes", "file1", index, field, item1[field], labels)
+                      ).join("");
 
-              const html2 = fieldsToKeep.map(field =>
-                renderEditableField("notes", "file2", index, field, item2[field], labels)
-              ).join("");
+                      const html2 = fieldsToKeep.map(field =>
+                          renderEditableField("notes", "file2", index, field, item2[field], labels)
+                      ).join("");
 
-              return `
-                <tr>
-                  <td style="padding: 6px; border: 1px solid #ccc;">${html1}</td>
-                  <td style="padding: 6px; border: 1px solid #ccc;">${html2}</td>
-                  <td style="padding: 6px; border: 1px solid #ccc;">
-                    <select data-table="notes" data-index="${index}" class="merge-choice">
-                      <option value="both">Garder les deux</option>
-                      <option value="file1">Garder fichier 1</option>
-                      <option value="file2">Garder fichier 2</option>
-                      <option value="ignore">Ignorer</option>
-                    </select>
-                  </td>
-                </tr>`;
-            }).join("")}
-          </tbody>
-        </table>
+                      return `
+                          <tr>
+                              <td style="padding: 6px; border: 1px solid #ccc;">${html1}</td>
+                              <td style="padding: 6px; border: 1px solid #ccc;">${html2}</td>
+                              <td style="padding: 6px; border: 1px solid #ccc;">
+                                  <select data-table="notes" data-index="${index}" class="merge-choice">
+                                      <option value="both">Garder les deux</option>
+                                      <option value="file1">Garder fichier 1</option>
+                                      <option value="file2">Garder fichier 2</option>
+                                      <option value="ignore">Ignorer</option>
+                                  </select>
+                              </td>
+                          </tr>`;
+                  }).join("")}
+              </tbody>
+          </table>
       `;
-      // ✨ ATTACHER LES ÉCOUTEURS APRÈS QUE LE HTML A ÉTÉ INSÉRÉ DANS LE DOM ✨
-      // Pour les champs de texte éditables (Content des notes)
-      tabEl.querySelectorAll(".editable").forEach((el) => { // Utilisez tabEl.querySelectorAll
+
+      tabEl.innerHTML = generatedHTML; // Insérer le HTML généré
+
+      // Stocker le HTML et le hash pour le caching futur
+      cachedNotesTabHTML = generatedHTML;
+      notesDataHash = currentNotesDataState;
+
+      // Initialiser tous les éléments interactifs APRÈS que le HTML est dans le DOM
+      initializeNoteElements();
+  }
+
+  function initializeNoteElements() {
+    const tabEl = document.getElementById("tab-notes"); // Récupère l'élément du tableau des notes
+
+    // Pour les champs de texte éditables (Content des notes)
+    tabEl.querySelectorAll(".editable").forEach((el) => {
         el.addEventListener("input", (e) => {
-          const { table, file, index, field } = e.target.dataset;
-          if (
-            previewDataEdited[table] &&
-            previewDataEdited[table][file] &&
-            previewDataEdited[table][file][index]
-          ) {
-            previewDataEdited[table][file][index][field] = e.target.value;
-            console.log(`[EDITABLE INPUT] Table: ${table}, File: ${file}, Index: ${index}, Field: ${field}, New Value:`, previewDataEdited[table][file][index][field]);
-            console.log(`[EDITABLE INPUT] État actuel de previewDataEdited.tags.file1:`, previewDataEdited.tags.file1);
-            console.log(`[EDITABLE INPUT] État actuel de previewDataEdited.tags.file2:`, previewDataEdited.tags.file2);
-          }
-        });
-      });
-
-      // Après que le HTML est inséré et que tabEl.innerHTML est mis à jour
-      // (vers la fin de buildNotesTab)
-
-      // --- Ancien écouteur sur .note-tags-select sera supprimé/remplacé ici ---
-
-      // Initialisation de Tom Select pour chaque champ de sélection de tags
-      tabEl.querySelectorAll(".note-tags-tomselect").forEach((el) => {
-          const { table, file, index, noteid } = el.dataset;
-
-          const allFileTags = previewDataEdited.tags[file] || [];
-          console.log(`Initialisation Tom Select pour note [${file}][${index}]: allFileTags =`, allFileTags); // <-- AJOUTEZ CETTE LIGNE
-
-          new TomSelect(el, {
-              plugins: {
-                  'remove_button': {
-                      title: 'Supprimer ce tag'
-                  },
-              },
-              create: false,
-              sortField: {field: "$score", direction: "desc"},
-              valueField: 'TagId',
-              labelField: 'Name',
-              searchField: ['Name'],
-
-              options: allFileTags.map(tag => ({ TagId: tag.TagId, Name: tag.Name })),
-
-              onItemAdd: function(value) {
-                  const newTagId = parseInt(value);
-                  if (isNaN(newTagId)) return;
-                  const note = previewDataEdited[table][file][index];
-                  if (!Array.isArray(note.TagIds)) { note.TagIds = []; }
-                  note.TagIds.push(newTagId);
-                  note.TagIds = [...new Set(note.TagIds)];
-                  console.log(`Tag ${newTagId} ajouté à note [${file}][${index}]. Nouveaux TagIds:`, note.TagIds);
-              },
-              onItemRemove: function(value) {
-                  const removedTagId = parseInt(value);
-                  if (isNaN(removedTagId)) return;
-                  const note = previewDataEdited[table][file][index];
-                  if (Array.isArray(note.TagIds)) {
-                      note.TagIds = note.TagIds.filter(id => id !== removedTagId);
-                  }
-                  console.log(`Tag ${removedTagId} retiré de note [${file}][${index}]. Nouveaux TagIds:`, note.TagIds);
-              }
-          });
-      });
-
-      const existingPdfBtn = document.getElementById("exportPdfBtn");
-      if (existingPdfBtn) {
-          existingPdfBtn.remove(); // Supprimer l'ancien si la fonction est appelée plusieurs fois
-      }
-      const btn = document.createElement("button");
-      btn.id = "exportPdfBtn";
-      btn.textContent = "🖨️ Imprimer Notes en PDF";
-      btn.style.margin = "10px 0";
-      btn.onclick = exportNotesToPdf;
-      tabEl.prepend(btn); // Ou tabEl.appendChild(btn) si vous voulez qu'il soit après le tableau.
-                          // prepend le met en haut, appendChild le met en bas.
-                          // Choisissez l'emplacement qui vous convient le mieux.
-    }
-
-    // Variable pour s'assurer que MIN_LOAD_TIME_MS peut être géré de manière globale
-    const MIN_LOAD_TIME_MS = 3000; // Ou 30000 si c'est la durée réelle
-
-    window.refreshNotesTab = function() {
-      return new Promise((resolve) => {
-        const startAnimationTime = Date.now(); // Le temps où l'animation commence
-
-        // Déplacer l'exécution de buildNotesTab dans un setTimeout(0)
-        // pour permettre au thread principal de rendre l'animation.
-        setTimeout(() => {
-          buildNotesTab(); // Exécute le travail lourd de rendu
-
-          const elapsedBuildTime = Date.now() - startAnimationTime; // Temps total écoulé depuis le début de l'animation
-          const remainingTime = MIN_LOAD_TIME_MS - elapsedBuildTime;
-
-          if (remainingTime > 0) {
-            // S'assurer que la barre a un minimum de temps pour s'afficher
-            setTimeout(() => {
-              resolve();
-            }, remainingTime);
-          } else {
-            resolve(); // Résoudre immédiatement si le build a pris plus de temps que le MIN_LOAD_TIME_MS
-          }
-        }, 0); // <-- IMPORTANT : délai de 0ms ici
-      });
-    };
-
-    // 👇 première construction immédiate de l'onglet Notes
-    buildNotesTab();
-
-    // ──────────────────────────────────────────────────────────────────────────────
-    // Rendu des autres onglets : Bookmarks et Tags
-    // ──────────────────────────────────────────────────────────────────────────────
-    for (const tableName of ["bookmarks", "tags"]) {
-      const contents = previewData[tableName];
-      const tabEl = document.getElementById(`tab-${tableName.toLowerCase()}`);
-      if (!contents || !Array.isArray(contents.file1) || !Array.isArray(contents.file2)) continue;
-
-      const fieldsToKeep = fieldFilter[tableName.toLowerCase()] || [];
-      const maxLength = Math.max(contents.file1.length, contents.file2.length);
-
-      tabEl.innerHTML = `
-        <table style="width: 100%; border-collapse: collapse;">
-          <thead>
-            <tr style="background-color: #f0f0f0;">
-              <th style="width: 33%; padding: 8px;">📂 Fichier 1</th>
-              <th style="width: 33%; padding: 8px;">📂 Fichier 2</th>
-              <th style="width: 34%; padding: 8px;">✅ Choix</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${Array.from({ length: maxLength }).map((_, index) => {
-              const item1 = contents.file1[index] || {};
-              const item2 = contents.file2[index] || {};
-
-              const html1 = fieldsToKeep.map(field =>
-                renderEditableField(tableName.toLowerCase(), "file1", index, field, item1[field], labels)
-              ).join("");
-
-              const html2 = fieldsToKeep.map(field =>
-                renderEditableField(tableName.toLowerCase(), "file2", index, field, item2[field], labels)
-              ).join("");
-
-              return `
-                <tr>
-                  <td style="padding: 6px; border: 1px solid #ccc;">${html1}</td>
-                  <td style="padding: 6px; border: 1px solid #ccc;">${html2}</td>
-                  <td style="padding: 6px; border: 1px solid #ccc;">
-                    <select data-table="${tableName}" data-index="${index}" class="merge-choice">
-                      <option value="both">Garder les deux</option>
-                      <option value="file1">Garder fichier 1</option>
-                      <option value="file2">Garder fichier 2</option>
-                      <option value="ignore">Ignorer</option>
-                    </select>
-                  </td>
-                </tr>`;
-            }).join("")}
-          </tbody>
-        </table>
-      `;
-      tabEl.querySelectorAll(".editable").forEach((el) => {
-        el.addEventListener("input", (e) => {
-          const { table, file, index, field } = e.target.dataset;
-          if (
-            previewDataEdited[table] &&
-            previewDataEdited[table][file] &&
-            previewDataEdited[table][file][index]
-          ) {
-            previewDataEdited[table][file][index][field] = e.target.value;
-            // Logs pour vérifier la mise à jour des tags
-            console.log(`[EDITABLE INPUT - OTHER TABS] Table: ${table}, File: ${file}, Index: ${index}, Field: ${field}, New Value:`, previewDataEdited[table][file][index][field]);
-            if (table === "tags") {
-              console.log(`[EDITABLE INPUT - OTHER TABS] État actuel de previewDataEdited.tags.file1:`, previewDataEdited.tags.file1);
-              console.log(`[EDITABLE INPUT - OTHER TABS] État actuel de previewDataEdited.tags.file2:`, previewDataEdited.tags.file2);
+            const { table, file, index, field } = e.target.dataset;
+            if (
+                previewDataEdited[table] &&
+                previewDataEdited[table][file] &&
+                previewDataEdited[table][file][index]
+            ) {
+                previewDataEdited[table][file][index][field] = e.target.value;
+                // Invalider le cache des notes si le contenu d'une note change
+                invalidateNotesCache();
+                console.log(`[EDITABLE INPUT] Table: ${table}, File: ${file}, Index: ${index}, Field: ${field}, New Value:`, previewDataEdited[table][file][index][field]);
             }
-          }
         });
-      });
+    });
+
+    // Initialisation de Tom Select pour chaque champ de sélection de tags
+    tabEl.querySelectorAll(".note-tags-tomselect").forEach((el) => {
+        const { table, file, index, noteid } = el.dataset;
+        // console.log(`Initialisation Tom Select pour note [${file}][${index}]: allFileTags =`, previewDataEdited.tags[file] || []); // Laissez ce log pour le débogage si besoin
+
+        const allFileTags = previewDataEdited.tags[file] || [];
+
+        new TomSelect(el, {
+            plugins: {
+                'remove_button': {
+                    title: 'Supprimer ce tag'
+                },
+            },
+            create: false, // On a choisi de laisser cette option sur false pour l'instant
+            sortField: {field: "$score", direction: "desc"},
+            valueField: 'TagId',
+            labelField: 'Name',
+            searchField: ['Name'],
+
+            options: allFileTags.map(tag => ({ TagId: tag.TagId, Name: tag.Name })),
+
+            onItemAdd: function(value) {
+                const newTagId = parseInt(value);
+                if (isNaN(newTagId)) return;
+                const note = previewDataEdited[table][file][index];
+                if (!Array.isArray(note.TagIds)) {
+                    note.TagIds = [];
+                }
+                note.TagIds.push(newTagId);
+                note.TagIds = [...new Set(note.TagIds)]; // Assurer l'unicité
+                invalidateNotesCache(); // Invalider le cache si un tag est ajouté
+                console.log(`Tag ${newTagId} ajouté à note [${file}][${index}]. Nouveaux TagIds:`, note.TagIds);
+            },
+            onItemRemove: function(value) {
+                const removedTagId = parseInt(value);
+                if (isNaN(removedTagId)) return;
+                const note = previewDataEdited[table][file][index];
+                if (Array.isArray(note.TagIds)) {
+                    note.TagIds = note.TagIds.filter(id => id !== removedTagId);
+                }
+                invalidateNotesCache(); // Invalider le cache si un tag est retiré
+                console.log(`Tag ${removedTagId} retiré de note [${file}][${index}]. Nouveaux TagIds:`, note.TagIds);
+            }
+        });
+    });
+
+    // Pour les sélecteurs de choix de fusion (merge-choice)
+    tabEl.querySelectorAll(".merge-choice").forEach((el) => {
+        el.addEventListener("change", (e) => {
+            const { table, index } = e.target.dataset;
+            if (
+                previewDataEdited[table] &&
+                previewDataEdited[table].mergeChoices &&
+                previewDataEdited[table].mergeChoices[index] !== undefined
+            ) {
+                previewDataEdited[table].mergeChoices[index] = e.target.value;
+                invalidateNotesCache(); // Invalider le cache si un choix de fusion change
+                console.log(`[MERGE CHOICE] Table: ${table}, Index: ${index}, New Choice:`, previewDataEdited[table].mergeChoices[index]);
+            }
+        });
+    });
+
+    // Logique pour le bouton "Imprimer Notes en PDF"
+    // Vérifier si le bouton existe déjà pour éviter les doublons lors des re-générations
+    const existingPdfBtn = document.getElementById("exportPdfBtn");
+    if (existingPdfBtn) {
+        existingPdfBtn.remove(); // Supprimer l'ancien s'il est appelé plusieurs fois
     }
+    const btn = document.createElement("button");
+    btn.id = "exportPdfBtn";
+    btn.textContent = "🖨️ Imprimer Notes en PDF";
+    btn.style.margin = "10px 0";
+    btn.onclick = exportNotesToPdf; // Assurez-vous que exportNotesToPdf est définie ailleurs
+    tabEl.prepend(btn); // Ajoute le bouton en haut du conteneur de l'onglet Notes
   }
 
   function showFullNote(content) {
