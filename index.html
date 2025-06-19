@@ -860,6 +860,12 @@
     Name: "Catégorie"
   };
 
+  const fieldFilter = {
+    notes: ["Title", "Content"],
+    bookmarks: ["Title"],
+    tags: ["Name"]
+  };
+
   async function updateProgress(targetPercent, message, step) {
     return new Promise(resolve => {
       const startPercent = currentProgress;
@@ -1334,18 +1340,18 @@
     initializeNoteElements();
   }
 
-  function loadPreviewData(previewData) {
+  function processLoadedPreviewData(previewData) { // Ancien nom: loadPreviewData
     document.getElementById("preview-section").classList.remove("hidden");
     previewDataEdited = JSON.parse(JSON.stringify(previewData)); // Copie indépendante
 
     // 🧠 Construire pour chaque fichier une map NoteId → [TagId1, TagId2, ...]
     function buildNoteToTagIdsMap(tagMapArray) {
-      const result = {};
-      for (const { NoteId, TagId } of tagMapArray || []) {
-        if (!result[NoteId]) result[NoteId] = [];
-        result[NoteId].push(TagId);
-      }
-      return result;
+        const result = {};
+        for (const { NoteId, TagId } of tagMapArray || []) {
+            if (!result[NoteId]) result[NoteId] = [];
+            result[NoteId].push(TagId);
+        }
+        return result;
     }
 
     const tagIdsMap1 = buildNoteToTagIdsMap(previewData.tagMaps.file1);
@@ -1353,50 +1359,140 @@
 
     // Affecter à chaque note son tableau TagIds
     (previewDataEdited.notes.file1 || []).forEach(note => {
-      note.TagIds = tagIdsMap1[note.NoteId] || [];
+        note.TagIds = tagIdsMap1[note.NoteId] || [];
     });
     (previewDataEdited.notes.file2 || []).forEach(note => {
-      note.TagIds = tagIdsMap2[note.NoteId] || [];
+        note.TagIds = tagIdsMap2[note.NoteId] || [];
     });
 
     // ──────────────────────────────────────────────────────────────────────────────
     //  INITIALISER previewDataEdited.tagMaps EN GARDANT DES TABLEAUX
     // ──────────────────────────────────────────────────────────────────────────────
     previewDataEdited.tagMaps = {
-      file1: (previewData.tagMaps.file1 || []).map(tm => ({ ...tm })),
-      file2: (previewData.tagMaps.file2 || []).map(tm => ({ ...tm }))
+        file1: (previewData.tagMaps.file1 || []).map(tm => ({ ...tm })),
+        file2: (previewData.tagMaps.file2 || []).map(tm => ({ ...tm }))
     };
-
 
     // ──────────────────────────────────────────────────────────────────────────────
     //  CONSTRUIRE previewDataEdited.tags.list PAR FICHIER
     // ──────────────────────────────────────────────────────────────────────────────
     previewDataEdited.tags = {
-      file1: [],
-      file2: []
+        file1: [],
+        file2: []
     };
 
     const seen1 = new Set();
     (previewData.tags.file1 || []).forEach(t => {
-      if (!seen1.has(t.TagId)) {
-        previewDataEdited.tags.file1.push({ TagId: t.TagId, Name: t.Name });
-        seen1.add(t.TagId);
-      }
+        if (!seen1.has(t.TagId)) {
+            previewDataEdited.tags.file1.push({ TagId: t.TagId, Name: t.Name });
+            seen1.add(t.TagId);
+        }
     });
 
     const seen2 = new Set();
     (previewData.tags.file2 || []).forEach(t => {
-      if (!seen2.has(t.TagId)) {
-        previewDataEdited.tags.file2.push({ TagId: t.TagId, Name: t.Name });
-        seen2.add(t.TagId);
-      }
+        if (!seen2.has(t.TagId)) {
+            previewDataEdited.tags.file2.push({ TagId: t.TagId, Name: t.Name });
+            seen2.add(t.TagId);
+        }
     });
 
-    const fieldFilter = {
-      notes: ["Title", "Content"],
-      bookmarks: ["Title"],
-      tags: ["Name"]
-    };
+    // fieldFilter et labels sont maintenant globaux, vous pouvez retirer leur déclaration d'ici
+    // const fieldFilter = { /* ... */ };
+    // const labels = { /* ... */ };
+
+    // --- NOUVEAUX APPELS POUR LES AUTRES ONGLET ---
+
+    // Une fois que previewDataEdited est COMPLÈTEMENT prêt:
+    invalidateNotesCache(); // Invalider le cache des notes pour forcer la première construction
+    window.refreshNotesTab(); // Appeler le rafraîchissement de l'onglet Notes (qui gère l'affichage)
+
+    // AFFICHER LES AUTRES ONGLETs APRÈS AVOIR CHARGÉ LES DONNÉES
+    // Ceci appellera showTab('bookmarks') qui à son tour construira l'onglet Bookmarks
+    // et showTab('tags') pour l'onglet Tags.
+    // L'ordre ici peut être ajusté si vous voulez qu'un onglet particulier soit affiché par défaut.
+    // Par exemple, si vous voulez que Bookmarks soit le premier affiché après le chargement:
+    // showTab('bookmarks'); // Ceci devrait être le tab par défaut après le chargement
+    // Puis l'utilisateur peut cliquer sur Notes ou Tags.
+
+    // Si vous voulez que l'onglet Notes soit le premier affiché, l'appel à window.refreshNotesTab() au-dessus suffit.
+    // Les appels showTab suivants sont pour s'assurer qu'ils sont prêts pour le clic utilisateur.
+    // Vous pouvez commenter ces lignes si le HTML des onglets bookmarks/tags est déjà généré
+    // une fois et n'a pas besoin d'être re-généré au premier affichage.
+
+    // La logique de génération des autres onglets (bookmarks et tags) est déjà dans le bloc
+    // `for (const tableName of ["bookmarks", "tags"]) { ... }` que vous avez.
+    // Il faut juste s'assurer qu'il est exécuté.
+    // Au lieu d'appeler showTab directement, assurons-nous que ce bloc s'exécute.
+
+    // ──────────────────────────────────────────────────────────────────────────────
+    // Rendu des autres onglets : Bookmarks et Tags (si cette logique est encore dans loadPreviewData)
+    // ──────────────────────────────────────────────────────────────────────────────
+    for (const tableName of ["bookmarks", "tags"]) {
+      const contents = previewDataEdited[tableName]; // Utilisez previewDataEdited
+      const tabEl = document.getElementById(`tab-${tableName.toLowerCase()}`);
+      if (!contents || !Array.isArray(contents.file1) || !Array.isArray(contents.file2)) continue;
+
+      const fieldsToKeep = fieldFilter[tableName.toLowerCase()] || []; // Assurez-vous que fieldFilter est global
+
+      const maxLength = Math.max(contents.file1.length, contents.file2.length);
+
+      tabEl.innerHTML = `
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr style="background-color: #f0f0f0;">
+              <th style="width: 33%; padding: 8px;">📂 Fichier 1</th>
+              <th style="width: 33%; padding: 8px;">📂 Fichier 2</th>
+              <th style="width: 34%; padding: 8px;">✅ Choix</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${Array.from({ length: maxLength }).map((_, index) => {
+              const item1 = contents.file1[index] || {};
+              const item2 = contents.file2[index] || {};
+
+              const html1 = fieldsToKeep.map(field =>
+                renderEditableField(tableName.toLowerCase(), "file1", index, field, item1[field], labels)
+              ).join("");
+
+              const html2 = fieldsToKeep.map(field =>
+                renderEditableField(tableName.toLowerCase(), "file2", index, field, item2[field], labels)
+              ).join("");
+
+              return `
+                <tr>
+                  <td style="padding: 6px; border: 1px solid #ccc;">${html1}</td>
+                  <td style="padding: 6px; border: 1px solid #ccc;">${html2}</td>
+                  <td style="padding: 6px; border: 1px solid #ccc;">
+                    <select data-table="${tableName}" data-index="${index}" class="merge-choice">
+                      <option value="both">Garder les deux</option>
+                      <option value="file1">Garder fichier 1</option>
+                      <option value="file2">Garder fichier 2</option>
+                      <option value="ignore">Ignorer</option>
+                    </select>
+                  </td>
+                </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      `;
+      // Attacher les écouteurs pour les champs éditables des autres onglets
+      tabEl.querySelectorAll(".editable").forEach((el) => {
+        el.addEventListener("input", (e) => {
+          const { table, file, index, field } = e.target.dataset;
+          if (
+            previewDataEdited[table] &&
+            previewDataEdited[table][file] &&
+            previewDataEdited[table][file][index]
+          ) {
+            previewDataEdited[table][file][index][field] = e.target.value;
+            console.log(`[EDITABLE INPUT - OTHER TABS] Table: ${table}, File: ${file}, Index: ${index}, Field: ${field}, New Value:`, previewDataEdited[table][file][index][field]);
+          }
+        });
+      });
+      // Si les autres onglets ont des Tom Select, ils devraient aussi avoir une fonction initializeOtherTabElements()
+      // comme initializeNoteElements()
+    }
   }
 
   function showFullNote(content) {
@@ -1529,7 +1625,7 @@
         throw new Error("Le backend n’a pas renvoyé la structure attendue pour les notes.");
       }
 
-      loadPreviewData(previewData);  // ← ici tu montres les tabs Notes, Bookmarks, Tags, etc.
+      loadPreviewDataprocessLoadedPreviewData(previewData);  // ← ici tu montres les tabs Notes, Bookmarks, Tags, etc.
 
       await updateProgress(100, "Aperçu prêt", 5);
       document.getElementById('merge-summary').classList.remove('hidden');
