@@ -1159,12 +1159,88 @@
       }
   }
 
+  // Variable globale pour stocker l'observer
+  let tomSelectObserver = null;
+
+  function initializeTomSelectsLazily() {
+      // Si un observer existe déjà, déconnectez-le pour éviter les fuites de mémoire
+      if (tomSelectObserver) {
+          tomSelectObserver.disconnect();
+      }
+
+      // Créez un nouvel observer
+      tomSelectObserver = new IntersectionObserver((entries, observer) => {
+          entries.forEach(entry => {
+              // Si l'élément est visible
+              if (entry.isIntersecting) {
+                  const el = entry.target;
+                  // Vérifiez si Tom Select n'a pas déjà été initialisé
+                  if (!el.classList.contains('tomselected')) { // Tom Select ajoute cette classe après initialisation
+                      const { table, file, index, noteid } = el.dataset;
+                      const allFileTags = previewDataEdited.tags[file] || [];
+
+                      new TomSelect(el, {
+                          plugins: {
+                              'remove_button': {
+                                  title: 'Supprimer ce tag'
+                              },
+                          },
+                          create: false,
+                          sortField: {field: "$score", direction: "desc"},
+                          valueField: 'TagId',
+                          labelField: 'Name',
+                          searchField: ['Name'],
+
+                          options: allFileTags.map(tag => ({ TagId: tag.TagId, Name: tag.Name })),
+
+                          onItemAdd: function(value) {
+                              const newTagId = parseInt(value);
+                              if (isNaN(newTagId)) return;
+                              const note = previewDataEdited[table][file][index];
+                              if (!Array.isArray(note.TagIds)) { note.TagIds = []; }
+                              note.TagIds.push(newTagId);
+                              note.TagIds = [...new Set(note.TagIds)];
+                              invalidateNotesCache();
+                              console.log(`[LAZY TS ADD] Tag ${newTagId} ajouté à note [${file}][${index}]. Nouveaux TagIds:`, note.TagIds);
+                          },
+                          onItemRemove: function(value) {
+                              const removedTagId = parseInt(value);
+                              if (isNaN(removedTagId)) return;
+                              const note = previewDataEdited[table][file][index];
+                              if (Array.isArray(note.TagIds)) {
+                                  note.TagIds = note.TagIds.filter(id => id !== removedTagId);
+                              }
+                              invalidateNotesCache();
+                              console.log(`[LAZY TS REMOVE] Tag ${removedTagId} retiré de note [${file}][${index}]. Nouveaux TagIds:`, note.TagIds);
+                          }
+                      });
+                  }
+                  // Une fois initialisé, on n'a plus besoin d'observer cet élément
+                  observer.unobserve(el);
+              }
+          });
+      }, {
+          root: null, // utilise le viewport comme conteneur racine
+          rootMargin: '0px', // ou '200px' pour précharger un peu plus tôt
+          threshold: 0.1 // L'élément est considéré comme visible dès que 10% de sa surface est visible
+      });
+
+      // Ciblez tous les éléments Tom Select non initialisés pour l'observation
+      document.querySelectorAll(".note-tags-tomselect").forEach(el => {
+          // S'il n'a pas déjà la classe 'tomselected', cela signifie qu'il n'est pas initialisé
+          if (!el.classList.contains('tomselected')) {
+              tomSelectObserver.observe(el);
+          }
+      });
+  }
+
   function initializeNoteElements() {
     const tabEl = document.getElementById("tab-notes"); // Récupère l'élément du tableau des notes
 
-    // Pour les champs de texte éditables (Content des notes)
-    tabEl.querySelectorAll(".editable").forEach((el) => {
-        el.addEventListener("input", (e) => {
+    // *** DÉLÉGATION D'ÉVÉNEMENTS pour .editable et .merge-choice ***
+    // Un seul écouteur sur tabEl pour les événements 'input'
+    tabEl.addEventListener("input", (e) => {
+        if (e.target.classList.contains("editable")) {
             const { table, file, index, field } = e.target.dataset;
             if (
                 previewDataEdited[table] &&
@@ -1172,62 +1248,15 @@
                 previewDataEdited[table][file][index]
             ) {
                 previewDataEdited[table][file][index][field] = e.target.value;
-                // Invalider le cache des notes si le contenu d'une note change
                 invalidateNotesCache();
-                console.log(`[EDITABLE INPUT] Table: ${table}, File: ${file}, Index: ${index}, Field: ${field}, New Value:`, previewDataEdited[table][file][index][field]);
+                console.log(`[DELEGATED INPUT] Table: ${table}, File: ${file}, Index: ${index}, Field: ${field}, New Value:`, previewDataEdited[table][file][index][field]);
             }
-        });
+        }
     });
 
-    // Initialisation de Tom Select pour chaque champ de sélection de tags
-    tabEl.querySelectorAll(".note-tags-tomselect").forEach((el) => {
-        const { table, file, index, noteid } = el.dataset;
-        // console.log(`Initialisation Tom Select pour note [${file}][${index}]: allFileTags =`, previewDataEdited.tags[file] || []); // Laissez ce log pour le débogage si besoin
-
-        const allFileTags = previewDataEdited.tags[file] || [];
-
-        new TomSelect(el, {
-            plugins: {
-                'remove_button': {
-                    title: 'Supprimer ce tag'
-                },
-            },
-            create: false, // On a choisi de laisser cette option sur false pour l'instant
-            sortField: {field: "$score", direction: "desc"},
-            valueField: 'TagId',
-            labelField: 'Name',
-            searchField: ['Name'],
-
-            options: allFileTags.map(tag => ({ TagId: tag.TagId, Name: tag.Name })),
-
-            onItemAdd: function(value) {
-                const newTagId = parseInt(value);
-                if (isNaN(newTagId)) return;
-                const note = previewDataEdited[table][file][index];
-                if (!Array.isArray(note.TagIds)) {
-                    note.TagIds = [];
-                }
-                note.TagIds.push(newTagId);
-                note.TagIds = [...new Set(note.TagIds)]; // Assurer l'unicité
-                invalidateNotesCache(); // Invalider le cache si un tag est ajouté
-                console.log(`Tag ${newTagId} ajouté à note [${file}][${index}]. Nouveaux TagIds:`, note.TagIds);
-            },
-            onItemRemove: function(value) {
-                const removedTagId = parseInt(value);
-                if (isNaN(removedTagId)) return;
-                const note = previewDataEdited[table][file][index];
-                if (Array.isArray(note.TagIds)) {
-                    note.TagIds = note.TagIds.filter(id => id !== removedTagId);
-                }
-                invalidateNotesCache(); // Invalider le cache si un tag est retiré
-                console.log(`Tag ${removedTagId} retiré de note [${file}][${index}]. Nouveaux TagIds:`, note.TagIds);
-            }
-        });
-    });
-
-    // Pour les sélecteurs de choix de fusion (merge-choice)
-    tabEl.querySelectorAll(".merge-choice").forEach((el) => {
-        el.addEventListener("change", (e) => {
+    // Un seul écouteur sur tabEl pour les événements 'change' (pour les sélecteurs)
+    tabEl.addEventListener("change", (e) => {
+        if (e.target.classList.contains("merge-choice")) {
             const { table, index } = e.target.dataset;
             if (
                 previewDataEdited[table] &&
@@ -1235,14 +1264,13 @@
                 previewDataEdited[table].mergeChoices[index] !== undefined
             ) {
                 previewDataEdited[table].mergeChoices[index] = e.target.value;
-                invalidateNotesCache(); // Invalider le cache si un choix de fusion change
-                console.log(`[MERGE CHOICE] Table: ${table}, Index: ${index}, New Choice:`, previewDataEdited[table].mergeChoices[index]);
+                invalidateNotesCache();
+                console.log(`[DELEGATED CHANGE] Table: ${table}, Index: ${index}, New Choice:`, previewDataEdited[table].mergeChoices[index]);
             }
-        });
+        }
     });
 
-    // Logique pour le bouton "Imprimer Notes en PDF"
-    // Vérifier si le bouton existe déjà pour éviter les doublons lors des re-générations
+    // Logique pour le bouton "Imprimer Notes en PDF" (reste inchangée, car un seul bouton)
     const existingPdfBtn = document.getElementById("exportPdfBtn");
     if (existingPdfBtn) {
         existingPdfBtn.remove(); // Supprimer l'ancien s'il est appelé plusieurs fois
@@ -1253,6 +1281,9 @@
     btn.style.margin = "10px 0";
     btn.onclick = exportNotesToPdf; // Assurez-vous que exportNotesToPdf est définie ailleurs
     tabEl.prepend(btn); // Ajoute le bouton en haut du conteneur de l'onglet Notes
+
+    // *** APPEL À L'INITIALISATION PARESSEUSE DE TOM SELECT ***
+    initializeTomSelectsLazily();
   }
 
   function invalidateNotesCache() {
