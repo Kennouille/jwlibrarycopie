@@ -582,6 +582,71 @@
       margin-top: 50px;
     }
 
+    /* Style du conteneur principal du Tom Select */
+    .tom-select {
+        /* Par exemple, une bordure plus prononcée */
+        border: 1px solid #7f8c8d; /* Une couleur gris-bleu foncé */
+        border-radius: 4px; /* Des coins légèrement arrondis */
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1); /* Une petite ombre pour le faire ressortir */
+    }
+
+    /* Style de la zone de contrôle (où sont les tags sélectionnés et le champ de saisie) */
+    .tom-select .ts-control {
+        padding: 6px 10px; /* Augmenter un peu le padding si désiré */
+        background-color: #f8f9fa; /* Un fond légèrement plus clair que le blanc pur */
+        border: none; /* Enlève la bordure interne si le .tom-select a déjà une bordure */
+        font-weight: normal; /* S'assurer que le texte n'est pas en gras sauf si vous le voulez */
+    }
+
+    /* Style du champ de saisie réel (là où l'on tape pour rechercher) */
+    .tom-select .ts-control input[type="text"] {
+        font-weight: bold; /* Le texte tapé sera en gras */
+        color: #2c3e50; /* Une couleur de texte un peu plus foncée */
+    }
+
+    /* Style des tags (pastilles) déjà sélectionnés */
+    .tom-select .item {
+        background-color: #3498db; /* Un fond bleu pour les tags */
+        color: white; /* Texte blanc sur les tags */
+        border-radius: 3px; /* Coins arrondis pour les tags */
+        padding: 2px 8px; /* Padding interne des tags */
+        margin: 2px; /* Marge entre les tags */
+        font-weight: bold; /* Texte des tags en gras */
+    }
+
+    /* Style du bouton de suppression sur les tags */
+    .tom-select .item .remove {
+        color: #ecf0f1; /* Couleur du X pour la suppression */
+        margin-left: 5px; /* Espace entre le texte du tag et le X */
+        font-weight: bold; /* Rendre le X plus visible */
+    }
+
+    /* Style de la liste déroulante (le menu qui s'ouvre) */
+    .tom-select .ts-dropdown {
+        border: 1px solid #bdc3c7; /* Bordure plus visible pour le dropdown */
+        border-top: none; /* Pas de bordure en haut car elle se connecte au ts-control */
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15); /* Ombre plus prononcée pour le dropdown */
+        background-color: white; /* Fond blanc du dropdown */
+    }
+
+    /* Style des options individuelles dans la liste déroulante */
+    .tom-select .option {
+        padding: 8px 10px; /* Padding des options */
+        /* font-weight: normal; */ /* Par défaut, pas de gras */
+    }
+
+    /* Style des options au survol */
+    .tom-select .option.active {
+        background-color: #e8f5fd; /* Fond bleu clair au survol */
+        color: #2c3e50;
+    }
+
+    /* Style des options déjà sélectionnées dans le dropdown */
+    /* Cela s'applique si vous aviez le plugin checkbox_options ou si elles sont juste marquées textuellement */
+    .tom-select .option.selected {
+        background-color: #d1e7f5; /* Un fond légèrement différent pour les options sélectionnées */
+        font-weight: bold; /* Rendre le texte des options sélectionnées en gras */
+    }
 
 
 
