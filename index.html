@@ -1010,127 +1010,6 @@
     }
   }
 
-  async function startPreparation() {
-    try {
-      const file1 = document.getElementById('file1').files[0];
-      const file2 = document.getElementById('file2').files[0];
-      const localDatetime = document.getElementById('local_datetime').value;
-
-      if (!file1 || !file2)
-        throw new Error(translations[window.currentLang].errors.selectFiles);
-      if (!file1.name.endsWith('.jwlibrary') || !file2.name.endsWith('.jwlibrary'))
-        throw new Error(translations[window.currentLang].errors.extension);
-      if (!localDatetime)
-        throw new Error(translations[window.currentLang].errors.missingDate);
-
-      const mergeButton = document.getElementById('mergeButton');
-      mergeButton.disabled = true;
-
-      await updateProgress(5, "Préparation des fichiers...", 1);
-      await simulateProcessing(800, 15, "Chargement des fichiers...", 1);
-
-      const zip1 = await JSZip.loadAsync(file1);
-      const zip2 = await JSZip.loadAsync(file2);
-
-      const userData1 = await zip1.file("userData.db").async("blob");
-      const userData2 = await zip2.file("userData.db").async("blob");
-
-      const maxCombinedSize = 95 * 1024 * 1024;
-      if (userData1.size + userData2.size > maxCombinedSize) {
-        throw new Error("Les fichiers userData.db sont trop volumineux (plus de 95MB combinés).");
-      }
-
-      const media1 = [], media2 = [];
-
-      const hashFile = async (file) => {
-        const buffer = await file.async("arraybuffer");
-        const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
-        return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-      };
-
-      const collectMedia = async (zip, targetList, skip = ["userData.db", "userData.db-shm", "userData.db-wal"]) => {
-        const skipSet = new Set(skip.map(s => s.toLowerCase()));
-        for (const file of Object.values(zip.files)) {
-          if (skipSet.has(file.name.toLowerCase())) continue;
-          const hash = await hashFile(file);
-          targetList.push({ name: file.name, file, hash });
-        }
-      };
-
-      await collectMedia(zip1, media1);
-      await collectMedia(zip2, media2);
-
-      const hashSet1 = new Set(media1.map(m => m.hash));
-      const uniqueMedia2 = media2.filter(m => !hashSet1.has(m.hash));
-      const combinedMedia = [...media1, ...uniqueMedia2];
-
-      window.mediaToInclude = await Promise.all(
-        combinedMedia.map(async (media) => ({
-          name: media.name,
-          file: await media.file.async("blob"),
-          hash: media.hash
-        }))
-      );
-
-      window.userData1 = userData1;
-      window.userData2 = userData2;
-
-      const formData = new FormData();
-      formData.append("file1", new File([userData1], "userData1.db"));
-      formData.append("file2", new File([userData2], "userData2.db"));
-
-      await updateProgress(20, "Téléversement...", 2);
-      await uploadWithProgress(`${BASE_URL}/upload`, formData);
-
-      await updateProgress(60, "Préparation de l'aperçu...", 3);
-      const previewRes = await fetch(`${BASE_URL}/prepare-preview`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ local_datetime: localDatetime })
-      });
-
-      if (!previewRes.ok) {
-        const text = await previewRes.text();
-        throw new Error("Erreur dans la préparation : " + text);
-      }
-
-      const previewData = await previewRes.json();
-
-      await updateProgress(85, "Prévisualisation en cours...", 4);
-
-      console.log("📦 Données reçues pour l’aperçu :", previewData);
-
-      // Sécurité : affichage des clés attendues
-      console.log("🔍 Aperçu .notes :", previewData.notes);
-      console.log("🔍 Aperçu .bookmarks :", previewData.bookmarks);
-      console.log("🔍 Aperçu .tags :", previewData.tags);
-      console.log("🔍 Aperçu .tagMaps :", {
-        file1: previewData.tagMaps.file1.length,
-        file2: previewData.tagMaps.file2.length
-      });
-
-      // Empêche l’erreur si previewData.notes est undefined
-      if (!previewData.notes || !Array.isArray(previewData.notes.file1) || !Array.isArray(previewData.notes.file2)) {
-        console.error("❌ 'notes.file1' ou 'notes.file2' manquant ou invalide dans le JSON reçu.");
-        throw new Error("Le backend n’a pas renvoyé la structure attendue pour les notes.");
-      }
-
-      loadPreviewData(previewData);  // ← ici tu montres les tabs Notes, Bookmarks, Tags, etc.
-
-      await updateProgress(100, "Aperçu prêt", 5);
-      document.getElementById('merge-summary').classList.remove('hidden');
-      document.getElementById("progressDetails").textContent = "✅ Prévisualisation terminée.";
-    } catch (error) {
-      console.error("Erreur:", error);
-      showError(error.message);
-      await logMergeToSupabase("error", error.message);
-      await updateProgress(currentProgress, `Erreur: ${error.message}`);
-      document.getElementById('mergeButton').disabled = false;
-    }
-  }
-
   let previewDataEdited = {}; // Pour stocker les modifications utilisateur
 
   function escapeHTML(str) {
@@ -1269,162 +1148,6 @@
       }
   }
 
-  function invalidateNotesCache() {
-    cachedNotesTabHTML = null;
-    notesDataHash = null;
-    console.log("Cache de l'onglet Notes invalidé.");
-  }
-
-  function loadPreviewData(previewData) {
-    document.getElementById("preview-section").classList.remove("hidden");
-    previewDataEdited = JSON.parse(JSON.stringify(previewData)); // Copie indépendante
-
-    // 🧠 Construire pour chaque fichier une map NoteId → [TagId1, TagId2, ...]
-    function buildNoteToTagIdsMap(tagMapArray) {
-      const result = {};
-      for (const { NoteId, TagId } of tagMapArray || []) {
-        if (!result[NoteId]) result[NoteId] = [];
-        result[NoteId].push(TagId);
-      }
-      return result;
-    }
-
-    const tagIdsMap1 = buildNoteToTagIdsMap(previewData.tagMaps.file1);
-    const tagIdsMap2 = buildNoteToTagIdsMap(previewData.tagMaps.file2);
-
-    // Affecter à chaque note son tableau TagIds
-    (previewDataEdited.notes.file1 || []).forEach(note => {
-      note.TagIds = tagIdsMap1[note.NoteId] || [];
-    });
-    (previewDataEdited.notes.file2 || []).forEach(note => {
-      note.TagIds = tagIdsMap2[note.NoteId] || [];
-    });
-
-    // ──────────────────────────────────────────────────────────────────────────────
-    //  INITIALISER previewDataEdited.tagMaps EN GARDANT DES TABLEAUX
-    // ──────────────────────────────────────────────────────────────────────────────
-    previewDataEdited.tagMaps = {
-      file1: (previewData.tagMaps.file1 || []).map(tm => ({ ...tm })),
-      file2: (previewData.tagMaps.file2 || []).map(tm => ({ ...tm }))
-    };
-
-
-    // ──────────────────────────────────────────────────────────────────────────────
-    //  CONSTRUIRE previewDataEdited.tags.list PAR FICHIER
-    // ──────────────────────────────────────────────────────────────────────────────
-    previewDataEdited.tags = {
-      file1: [],
-      file2: []
-    };
-
-    const seen1 = new Set();
-    (previewData.tags.file1 || []).forEach(t => {
-      if (!seen1.has(t.TagId)) {
-        previewDataEdited.tags.file1.push({ TagId: t.TagId, Name: t.Name });
-        seen1.add(t.TagId);
-      }
-    });
-
-    const seen2 = new Set();
-    (previewData.tags.file2 || []).forEach(t => {
-      if (!seen2.has(t.TagId)) {
-        previewDataEdited.tags.file2.push({ TagId: t.TagId, Name: t.Name });
-        seen2.add(t.TagId);
-      }
-    });
-
-    const fieldFilter = {
-      notes: ["Title", "Content"],
-      bookmarks: ["Title"],
-      tags: ["Name"]
-    };
-
-    const labels = {
-      Title: "Titre",
-      Content: "Note",
-      Name: "Catégorie"
-    };
-  }
-
-  // ──────────────────────────────────────────────────────────────────────────────
-  // Fonction réutilisable pour générer l’onglet Notes
-  // ──────────────────────────────────────────────────────────────────────────────
-  function buildNotesTab() {
-    console.log("buildNotesTab: Démarrage de la reconstruction de l'onglet Notes.");
-    const tabEl = document.getElementById("tab-notes");
-
-    // Calculer un hash simple des données des notes
-    // C'est une méthode simple pour détecter si les données ont changé.
-    // Une méthode plus robuste serait de hacher un JSON.stringify(previewDataEdited.notes)
-    // mais ça peut aussi être coûteux. Pour l'instant, on fait simple.
-    const currentNotesDataState = JSON.stringify(previewDataEdited.notes);
-
-    // Si le HTML est en cache ET que les données n'ont pas changé, utilisez le cache
-    if (cachedNotesTabHTML && notesDataHash === currentNotesDataState) {
-        console.log("buildNotesTab: Chargement de l'onglet Notes depuis le cache.");
-        tabEl.innerHTML = cachedNotesTabHTML;
-        // Important : Ré-initialiser Tom Select et les autres écouteurs même si c'est depuis le cache !
-        // Car les éléments DOM ont été recréés par innerHTML
-        initializeNoteElements(); // Nouvelle fonction pour regrouper les initialisations
-        return; // Sortir de la fonction
-    }
-
-    console.log("buildNotesTab: Génération complète de l'onglet Notes.");
-    // --- Votre code existant pour générer le HTML ---
-    const contents = previewDataEdited.notes;
-    const fieldsToKeep = ["Title", "Content"];
-    const maxLength = Math.max(contents.file1.length, contents.file2.length);
-
-    const generatedHTML = `
-        <table style="width: 100%; border-collapse: collapse;">
-            <thead>
-                <tr style="background-color: #f0f0f0;">
-                    <th style="width: 33%; padding: 8px;">📂 Fichier 1</th>
-                    <th style="width: 33%; padding: 8px;">📂 Fichier 2</th>
-                    <th style="width: 34%; padding: 8px;">✅ Choix</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${Array.from({ length: maxLength }).map((_, index) => {
-                    const item1 = contents.file1[index] || {};
-                    const item2 = contents.file2[index] || {};
-
-                    const html1 = fieldsToKeep.map(field =>
-                        renderEditableField("notes", "file1", index, field, item1[field], labels)
-                    ).join("");
-
-                    const html2 = fieldsToKeep.map(field =>
-                        renderEditableField("notes", "file2", index, field, item2[field], labels)
-                    ).join("");
-
-                    return `
-                        <tr>
-                            <td style="padding: 6px; border: 1px solid #ccc;">${html1}</td>
-                            <td style="padding: 6px; border: 1px solid #ccc;">${html2}</td>
-                            <td style="padding: 6px; border: 1px solid #ccc;">
-                                <select data-table="notes" data-index="${index}" class="merge-choice">
-                                    <option value="both">Garder les deux</option>
-                                    <option value="file1">Garder fichier 1</option>
-                                    <option value="file2">Garder fichier 2</option>
-                                    <option value="ignore">Ignorer</option>
-                                </select>
-                            </td>
-                        </tr>`;
-                }).join("")}
-            </tbody>
-        </table>
-    `;
-
-    tabEl.innerHTML = generatedHTML; // Insérer le HTML généré
-
-    // Stocker le HTML et le hash pour le caching futur
-    cachedNotesTabHTML = generatedHTML;
-    notesDataHash = currentNotesDataState;
-
-    // Initialiser tous les éléments interactifs APRÈS que le HTML est dans le DOM
-    initializeNoteElements();
-  }
-
   function initializeNoteElements() {
     const tabEl = document.getElementById("tab-notes"); // Récupère l'élément du tableau des notes
 
@@ -1521,6 +1244,162 @@
     tabEl.prepend(btn); // Ajoute le bouton en haut du conteneur de l'onglet Notes
   }
 
+  function invalidateNotesCache() {
+    cachedNotesTabHTML = null;
+    notesDataHash = null;
+    console.log("Cache de l'onglet Notes invalidé.");
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────────
+  // Fonction réutilisable pour générer l’onglet Notes
+  // ──────────────────────────────────────────────────────────────────────────────
+  function buildNotesTab() {
+    console.log("buildNotesTab: Démarrage de la reconstruction de l'onglet Notes.");
+    const tabEl = document.getElementById("tab-notes");
+
+    // Calculer un hash simple des données des notes
+    // C'est une méthode simple pour détecter si les données ont changé.
+    // Une méthode plus robuste serait de hacher un JSON.stringify(previewDataEdited.notes)
+    // mais ça peut aussi être coûteux. Pour l'instant, on fait simple.
+    const currentNotesDataState = JSON.stringify(previewDataEdited.notes);
+
+    // Si le HTML est en cache ET que les données n'ont pas changé, utilisez le cache
+    if (cachedNotesTabHTML && notesDataHash === currentNotesDataState) {
+        console.log("buildNotesTab: Chargement de l'onglet Notes depuis le cache.");
+        tabEl.innerHTML = cachedNotesTabHTML;
+        // Important : Ré-initialiser Tom Select et les autres écouteurs même si c'est depuis le cache !
+        // Car les éléments DOM ont été recréés par innerHTML
+        initializeNoteElements(); // Nouvelle fonction pour regrouper les initialisations
+        return; // Sortir de la fonction
+    }
+
+    console.log("buildNotesTab: Génération complète de l'onglet Notes.");
+    // --- Votre code existant pour générer le HTML ---
+    const contents = previewDataEdited.notes;
+    const fieldsToKeep = ["Title", "Content"];
+    const maxLength = Math.max(contents.file1.length, contents.file2.length);
+
+    const generatedHTML = `
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background-color: #f0f0f0;">
+                    <th style="width: 33%; padding: 8px;">📂 Fichier 1</th>
+                    <th style="width: 33%; padding: 8px;">📂 Fichier 2</th>
+                    <th style="width: 34%; padding: 8px;">✅ Choix</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${Array.from({ length: maxLength }).map((_, index) => {
+                    const item1 = contents.file1[index] || {};
+                    const item2 = contents.file2[index] || {};
+
+                    const html1 = fieldsToKeep.map(field =>
+                        renderEditableField("notes", "file1", index, field, item1[field], labels)
+                    ).join("");
+
+                    const html2 = fieldsToKeep.map(field =>
+                        renderEditableField("notes", "file2", index, field, item2[field], labels)
+                    ).join("");
+
+                    return `
+                        <tr>
+                            <td style="padding: 6px; border: 1px solid #ccc;">${html1}</td>
+                            <td style="padding: 6px; border: 1px solid #ccc;">${html2}</td>
+                            <td style="padding: 6px; border: 1px solid #ccc;">
+                                <select data-table="notes" data-index="${index}" class="merge-choice">
+                                    <option value="both">Garder les deux</option>
+                                    <option value="file1">Garder fichier 1</option>
+                                    <option value="file2">Garder fichier 2</option>
+                                    <option value="ignore">Ignorer</option>
+                                </select>
+                            </td>
+                        </tr>`;
+                }).join("")}
+            </tbody>
+        </table>
+    `;
+
+    tabEl.innerHTML = generatedHTML; // Insérer le HTML généré
+
+    // Stocker le HTML et le hash pour le caching futur
+    cachedNotesTabHTML = generatedHTML;
+    notesDataHash = currentNotesDataState;
+
+    // Initialiser tous les éléments interactifs APRÈS que le HTML est dans le DOM
+    initializeNoteElements();
+  }
+
+  function loadPreviewData(previewData) {
+    document.getElementById("preview-section").classList.remove("hidden");
+    previewDataEdited = JSON.parse(JSON.stringify(previewData)); // Copie indépendante
+
+    // 🧠 Construire pour chaque fichier une map NoteId → [TagId1, TagId2, ...]
+    function buildNoteToTagIdsMap(tagMapArray) {
+      const result = {};
+      for (const { NoteId, TagId } of tagMapArray || []) {
+        if (!result[NoteId]) result[NoteId] = [];
+        result[NoteId].push(TagId);
+      }
+      return result;
+    }
+
+    const tagIdsMap1 = buildNoteToTagIdsMap(previewData.tagMaps.file1);
+    const tagIdsMap2 = buildNoteToTagIdsMap(previewData.tagMaps.file2);
+
+    // Affecter à chaque note son tableau TagIds
+    (previewDataEdited.notes.file1 || []).forEach(note => {
+      note.TagIds = tagIdsMap1[note.NoteId] || [];
+    });
+    (previewDataEdited.notes.file2 || []).forEach(note => {
+      note.TagIds = tagIdsMap2[note.NoteId] || [];
+    });
+
+    // ──────────────────────────────────────────────────────────────────────────────
+    //  INITIALISER previewDataEdited.tagMaps EN GARDANT DES TABLEAUX
+    // ──────────────────────────────────────────────────────────────────────────────
+    previewDataEdited.tagMaps = {
+      file1: (previewData.tagMaps.file1 || []).map(tm => ({ ...tm })),
+      file2: (previewData.tagMaps.file2 || []).map(tm => ({ ...tm }))
+    };
+
+
+    // ──────────────────────────────────────────────────────────────────────────────
+    //  CONSTRUIRE previewDataEdited.tags.list PAR FICHIER
+    // ──────────────────────────────────────────────────────────────────────────────
+    previewDataEdited.tags = {
+      file1: [],
+      file2: []
+    };
+
+    const seen1 = new Set();
+    (previewData.tags.file1 || []).forEach(t => {
+      if (!seen1.has(t.TagId)) {
+        previewDataEdited.tags.file1.push({ TagId: t.TagId, Name: t.Name });
+        seen1.add(t.TagId);
+      }
+    });
+
+    const seen2 = new Set();
+    (previewData.tags.file2 || []).forEach(t => {
+      if (!seen2.has(t.TagId)) {
+        previewDataEdited.tags.file2.push({ TagId: t.TagId, Name: t.Name });
+        seen2.add(t.TagId);
+      }
+    });
+
+    const fieldFilter = {
+      notes: ["Title", "Content"],
+      bookmarks: ["Title"],
+      tags: ["Name"]
+    };
+
+    const labels = {
+      Title: "Titre",
+      Content: "Note",
+      Name: "Catégorie"
+    };
+  }
+
   function showFullNote(content) {
     document.getElementById("noteModalText").textContent = event.target.previousElementSibling?.value || content;
     document.getElementById("noteModal").style.display = "flex";
@@ -1543,6 +1422,127 @@
       document.getElementById("noteModal").style.display = "none";
     }
   });
+
+  async function startPreparation() {
+    try {
+      const file1 = document.getElementById('file1').files[0];
+      const file2 = document.getElementById('file2').files[0];
+      const localDatetime = document.getElementById('local_datetime').value;
+
+      if (!file1 || !file2)
+        throw new Error(translations[window.currentLang].errors.selectFiles);
+      if (!file1.name.endsWith('.jwlibrary') || !file2.name.endsWith('.jwlibrary'))
+        throw new Error(translations[window.currentLang].errors.extension);
+      if (!localDatetime)
+        throw new Error(translations[window.currentLang].errors.missingDate);
+
+      const mergeButton = document.getElementById('mergeButton');
+      mergeButton.disabled = true;
+
+      await updateProgress(5, "Préparation des fichiers...", 1);
+      await simulateProcessing(800, 15, "Chargement des fichiers...", 1);
+
+      const zip1 = await JSZip.loadAsync(file1);
+      const zip2 = await JSZip.loadAsync(file2);
+
+      const userData1 = await zip1.file("userData.db").async("blob");
+      const userData2 = await zip2.file("userData.db").async("blob");
+
+      const maxCombinedSize = 95 * 1024 * 1024;
+      if (userData1.size + userData2.size > maxCombinedSize) {
+        throw new Error("Les fichiers userData.db sont trop volumineux (plus de 95MB combinés).");
+      }
+
+      const media1 = [], media2 = [];
+
+      const hashFile = async (file) => {
+        const buffer = await file.async("arraybuffer");
+        const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
+        return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+      };
+
+      const collectMedia = async (zip, targetList, skip = ["userData.db", "userData.db-shm", "userData.db-wal"]) => {
+        const skipSet = new Set(skip.map(s => s.toLowerCase()));
+        for (const file of Object.values(zip.files)) {
+          if (skipSet.has(file.name.toLowerCase())) continue;
+          const hash = await hashFile(file);
+          targetList.push({ name: file.name, file, hash });
+        }
+      };
+
+      await collectMedia(zip1, media1);
+      await collectMedia(zip2, media2);
+
+      const hashSet1 = new Set(media1.map(m => m.hash));
+      const uniqueMedia2 = media2.filter(m => !hashSet1.has(m.hash));
+      const combinedMedia = [...media1, ...uniqueMedia2];
+
+      window.mediaToInclude = await Promise.all(
+        combinedMedia.map(async (media) => ({
+          name: media.name,
+          file: await media.file.async("blob"),
+          hash: media.hash
+        }))
+      );
+
+      window.userData1 = userData1;
+      window.userData2 = userData2;
+
+      const formData = new FormData();
+      formData.append("file1", new File([userData1], "userData1.db"));
+      formData.append("file2", new File([userData2], "userData2.db"));
+
+      await updateProgress(20, "Téléversement...", 2);
+      await uploadWithProgress(`${BASE_URL}/upload`, formData);
+
+      await updateProgress(60, "Préparation de l'aperçu...", 3);
+      const previewRes = await fetch(`${BASE_URL}/prepare-preview`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ local_datetime: localDatetime })
+      });
+
+      if (!previewRes.ok) {
+        const text = await previewRes.text();
+        throw new Error("Erreur dans la préparation : " + text);
+      }
+
+      const previewData = await previewRes.json();
+
+      await updateProgress(85, "Prévisualisation en cours...", 4);
+
+      console.log("📦 Données reçues pour l’aperçu :", previewData);
+
+      // Sécurité : affichage des clés attendues
+      console.log("🔍 Aperçu .notes :", previewData.notes);
+      console.log("🔍 Aperçu .bookmarks :", previewData.bookmarks);
+      console.log("🔍 Aperçu .tags :", previewData.tags);
+      console.log("🔍 Aperçu .tagMaps :", {
+        file1: previewData.tagMaps.file1.length,
+        file2: previewData.tagMaps.file2.length
+      });
+
+      // Empêche l’erreur si previewData.notes est undefined
+      if (!previewData.notes || !Array.isArray(previewData.notes.file1) || !Array.isArray(previewData.notes.file2)) {
+        console.error("❌ 'notes.file1' ou 'notes.file2' manquant ou invalide dans le JSON reçu.");
+        throw new Error("Le backend n’a pas renvoyé la structure attendue pour les notes.");
+      }
+
+      loadPreviewData(previewData);  // ← ici tu montres les tabs Notes, Bookmarks, Tags, etc.
+
+      await updateProgress(100, "Aperçu prêt", 5);
+      document.getElementById('merge-summary').classList.remove('hidden');
+      document.getElementById("progressDetails").textContent = "✅ Prévisualisation terminée.";
+    } catch (error) {
+      console.error("Erreur:", error);
+      showError(error.message);
+      await logMergeToSupabase("error", error.message);
+      await updateProgress(currentProgress, `Erreur: ${error.message}`);
+      document.getElementById('mergeButton').disabled = false;
+    }
+  }
 
   async function exportNotesToPdf() {
     const { jsPDF } = window.jspdf;
