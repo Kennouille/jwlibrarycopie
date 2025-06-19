@@ -854,8 +854,13 @@
   let cachedNotesTabHTML = null; // Variable pour stocker le HTML de l'onglet Notes
   let notesDataHash = null;      // Pour stocker un "hash" ou une représentation de l'état actuel des données de notes
                                // afin de savoir si les données ont changé.
+  const labels = {
+    Title: "Titre",
+    Content: "Note",
+    Name: "Catégorie"
+  };
 
-   async function updateProgress(targetPercent, message, step) {
+  async function updateProgress(targetPercent, message, step) {
     return new Promise(resolve => {
       const startPercent = currentProgress;
       const duration = 500;
@@ -1391,12 +1396,6 @@
       notes: ["Title", "Content"],
       bookmarks: ["Title"],
       tags: ["Name"]
-    };
-
-    const labels = {
-      Title: "Titre",
-      Content: "Note",
-      Name: "Catégorie"
     };
   }
 
