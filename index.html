@@ -1637,7 +1637,14 @@
 
       const previewData = await previewRes.json();
 
-      await updateProgress(85, "Prévisualisation en cours...", 4);
+      // --- DÉBUT DES MODIFICATIONS POUR LA PHASE 4 ---
+
+      // La barre atteint un point de départ visuel pour la phase 4.
+      // Le travail de génération du DOM commence APRÈS cette ligne.
+      await updateProgress(85, "Génération de la prévisualisation dans le navigateur...", 4);
+
+      // Enregistrez le temps AVANT le travail lourd de JS
+      const startProcessingTime = performance.now();
 
       console.log("📦 Données reçues pour l’aperçu :", previewData);
 
@@ -1656,7 +1663,27 @@
         throw new Error("Le backend n’a pas renvoyé la structure attendue pour les notes.");
       }
 
-      processLoadedPreviewData(previewData);  // ← ici tu montres les tabs Notes, Bookmarks, Tags, etc.
+      // Exécutez le traitement lourd de génération des onglets
+      // Ceci inclut la création du HTML et le premier appel à refreshNotesTab
+      processLoadedPreviewData(previewData);
+
+      // Enregistrez le temps APRÈS le travail lourd de JS
+      const endProcessingTime = performance.now();
+      const actualProcessingDuration = endProcessingTime - startProcessingTime;
+
+      // Définissons une durée minimale pour que l'animation de la barre ait le temps de s'afficher.
+      // C'est la durée que la barre doit au moins prendre pour passer de 85% à 95%.
+      const minAnimationDurationForPhase4 = 3000; // Par exemple, 3 secondes
+
+      // Calculez combien de temps il reste à "simuler" si le traitement réel a été trop rapide.
+      // Si le traitement réel a pris 8-10 secondes, remainingSimulationDuration sera 0.
+      const remainingSimulationDuration = Math.max(0, minAnimationDurationForPhase4 - actualProcessingDuration);
+
+      // Simule la progression de 85% à 95% sur la durée restante calculée.
+      // Le message change pour indiquer que l'affichage est en cours.
+      await simulateProcessing(remainingSimulationDuration, 95, "Affichage des données dans les onglets...", 4);
+
+      // --- FIN DES MODIFICATIONS POUR LA PHASE 4 ---
 
       await updateProgress(100, "Aperçu prêt", 5);
       document.getElementById('merge-summary').classList.remove('hidden');
