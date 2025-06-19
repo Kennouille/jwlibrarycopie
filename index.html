@@ -1351,62 +1351,41 @@
 
       // Initialisation de Tom Select pour chaque champ de sélection de tags
       tabEl.querySelectorAll(".note-tags-tomselect").forEach((el) => {
-          // Récupérer les data-attributes pour pouvoir les utiliser dans les callbacks de Tom Select
           const { table, file, index, noteid } = el.dataset;
 
-          // Récupérer toutes les options de tags disponibles pour ce fichier (important!)
-          // Assurez-vous que previewDataEdited.tags[file] contient tous les tags possibles pour ce fichier.
           const allFileTags = previewDataEdited.tags[file] || [];
+          console.log(`Initialisation Tom Select pour note [${file}][${index}]: allFileTags =`, allFileTags); // <-- AJOUTEZ CETTE LIGNE
 
           new TomSelect(el, {
               plugins: {
                   'remove_button': {
                       title: 'Supprimer ce tag'
                   },
-                  // 'clear_button': { // Optionnel : ajoute un bouton pour effacer toutes les sélections
-                  //     title: 'Effacer tous les tags'
-                  // },
-                  // 'checkbox_options': {} // Optionnel : affiche des checkboxes dans la liste déroulante
               },
-              create: false, // Pas de création de nouveaux tags à la volée, si vous voulez juste sélectionner des tags existants
-              sortField: {field: "$score", direction: "desc"}, // Trie par pertinence de la recherche
-              valueField: 'TagId', // Le champ de l'objet option qui sera la valeur (<option value="ID">)
-              labelField: 'Name',   // Le champ de l'objet option qui sera le texte (<option>Nom</option>)
-              searchField: ['Name'], // Les champs sur lesquels la recherche s'effectue
+              create: false,
+              sortField: {field: "$score", direction: "desc"},
+              valueField: 'TagId',
+              labelField: 'Name',
+              searchField: ['Name'],
 
-              // Les options complètes de tous les tags pour Tom Select (pas seulement celles sélectionnées)
-              // Elles doivent être au format attendu par Tom Select (objets avec valueField et labelField)
               options: allFileTags.map(tag => ({ TagId: tag.TagId, Name: tag.Name })),
 
-              // Callbacks pour mettre à jour previewDataEdited
               onItemAdd: function(value) {
-                  // Convertir la valeur en nombre
                   const newTagId = parseInt(value);
                   if (isNaN(newTagId)) return;
-
-                  // Mettre à jour previewDataEdited pour la note concernée
                   const note = previewDataEdited[table][file][index];
-                  if (!Array.isArray(note.TagIds)) {
-                      note.TagIds = [];
-                  }
+                  if (!Array.isArray(note.TagIds)) { note.TagIds = []; }
                   note.TagIds.push(newTagId);
-                  note.TagIds = [...new Set(note.TagIds)]; // Assurer l'unicité et la propreté
-
+                  note.TagIds = [...new Set(note.TagIds)];
                   console.log(`Tag ${newTagId} ajouté à note [${file}][${index}]. Nouveaux TagIds:`, note.TagIds);
               },
               onItemRemove: function(value) {
-                  // Convertir la valeur en nombre
                   const removedTagId = parseInt(value);
                   if (isNaN(removedTagId)) return;
-
-                  // Mettre à jour previewDataEdited pour la note concernée
                   const note = previewDataEdited[table][file][index];
                   if (Array.isArray(note.TagIds)) {
                       note.TagIds = note.TagIds.filter(id => id !== removedTagId);
                   }
-                  // Si la liste devient vide et que vous voulez stocker [] plutôt que [null], ajustez ici
-                  // note.TagIds = note.TagIds.length === 0 ? null : note.TagIds;
-
                   console.log(`Tag ${removedTagId} retiré de note [${file}][${index}]. Nouveaux TagIds:`, note.TagIds);
               }
           });
