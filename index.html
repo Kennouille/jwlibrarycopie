@@ -596,6 +596,8 @@
 <script src="https://cdn.jsdelivr.net/npm/fflate@0.7.4/umd/index.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 </head>
 <body>
 <div class="container">
@@ -1088,30 +1090,35 @@
         <input type="text" value="${escaped}" style="width:100%;" readonly></div>`;
     }
 
-    // 📝 Zone de texte pour "Content" avec 5 menus de catégories
+    // 📝 Zone de texte pour "Content" avec un Tom Select pour les catégories
     if (table === "notes" && field === "Content") {
-      const tagIds = Array.isArray(noteObj.TagIds) ? noteObj.TagIds : [];
+        const tagIds = Array.isArray(noteObj.TagIds) ? noteObj.TagIds : [];
+        // Assurez-vous que tagIds contient des nombres si vos TagId sont des nombres
+        const currentNoteTagIds = tagIds.map(id => parseInt(id)).filter(id => !isNaN(id));
 
-      return `<div>
-        <strong>${labels[field]} :</strong><br>
-        <textarea class="editable" id="${id}" data-table="${table}" data-file="${fileKey}" data-index="${index}" data-field="${field}" rows="4" style="width:100%;">${escaped}</textarea>
-        <a href="#" class="show-full-note" data-content="${escaped}" data-label="${labels[field]}" style="display:inline-block;margin-top:5px;">🔍 Voir en grand</a>
-        <br><br>
-        <label>Catégories :</label><br>
-        ${[0, 1, 2, 3, 4].map(i => {
-          const selectedId = String(tagIds[i] || "");
-          const options = [`<option value="">Aucune catégorie</option>`].concat(
-            (previewDataEdited.tags[fileKey] || []).map(cat => {
-              const selected = String(cat.TagId) === selectedId ? "selected" : "";
-              return `<option value="${cat.TagId}" ${selected}>${cat.Name}</option>`;
-            })
-          ).join("");
+        // Préparez les options pour le sélecteur Tom Select
+        // Nous allons générer toutes les options possibles ici,
+        // et Tom Select s'occupera de l'initialisation des sélections et de la recherche.
+        const allAvailableTags = previewDataEdited.tags[fileKey] || [];
+        const optionsHtml = allAvailableTags.map(cat => {
+            // Marquer comme "selected" si ce tag est déjà dans les tags de la note courante
+            const selected = currentNoteTagIds.includes(cat.TagId) ? "selected" : "";
+            return `<option value="${cat.TagId}" ${selected}>${escapeHTML(cat.Name)}</option>`;
+        }).join("");
 
-          return `<select class="note-tags-select"
-                          data-table="${table}" data-file="${fileKey}" data-index="${index}" data-noteid="${noteId}" data-cat-index="${i}"
-                          style="width:100%; margin-top:4px;">${options}</select>`;
-        }).join("")}
-      </div>`;
+        return `<div>
+          <strong>${labels[field]} :</strong><br>
+          <textarea class="editable" id="${id}" data-table="${table}" data-file="${fileKey}" data-index="${index}" data-field="${field}" rows="4" style="width:100%;">${escaped}</textarea>
+          <a href="#" class="show-full-note" data-content="${escaped}" data-label="${labels[field]}" style="display:inline-block;margin-top:5px;">🔍 Voir en grand</a>
+          <br><br>
+          <label>Catégories :</label><br>
+          <select id="${id}-tomselect" class="note-tags-tomselect" multiple
+                  data-table="${table}" data-file="${fileKey}" data-index="${index}" data-noteid="${noteId}"
+                  placeholder="Sélectionnez des catégories..."
+                  style="width:100%; margin-top:4px;">
+              ${optionsHtml}
+          </select>
+        </div>`;
     }
 
     // 🔤 Champs standards (ex : Name)
@@ -1337,31 +1344,72 @@
         });
       });
 
-      // Pour les sélecteurs de tags des notes
-      tabEl.querySelectorAll(".note-tags-select").forEach((el) => { // Utilisez tabEl.querySelectorAll
-        el.addEventListener("change", (e) => {
-          const { table, file, index, catIndex } = e.target.dataset;
-          const newTagId = parseInt(e.target.value);
+      // Après que le HTML est inséré et que tabEl.innerHTML est mis à jour
+      // (vers la fin de buildNotesTab)
 
-          if (
-            !previewDataEdited[table] ||
-            !previewDataEdited[table][file] ||
-            !previewDataEdited[table][file][index]
-          ) {
-            return;
-          }
+      // --- Ancien écouteur sur .note-tags-select sera supprimé/remplacé ici ---
 
-          const note = previewDataEdited[table][file][index];
-          if (!Array.isArray(note.TagIds)) {
-            note.TagIds = [];
-          }
-          note.TagIds[catIndex] = isNaN(newTagId) ? null : newTagId;
-          const cleanedTagIds = note.TagIds.filter(id => id !== null && id !== undefined && !isNaN(id));
-          note.TagIds = [...new Set(cleanedTagIds)];
+      // Initialisation de Tom Select pour chaque champ de sélection de tags
+      tabEl.querySelectorAll(".note-tags-tomselect").forEach((el) => {
+          // Récupérer les data-attributes pour pouvoir les utiliser dans les callbacks de Tom Select
+          const { table, file, index, noteid } = el.dataset;
 
-          console.log(`Note ${index}, ${file}, Tag sur position ${catIndex} mis à jour.`);
-          console.log(`Nouveaux TagIds pour cette note:`, note.TagIds);
-        });
+          // Récupérer toutes les options de tags disponibles pour ce fichier (important!)
+          // Assurez-vous que previewDataEdited.tags[file] contient tous les tags possibles pour ce fichier.
+          const allFileTags = previewDataEdited.tags[file] || [];
+
+          new TomSelect(el, {
+              plugins: {
+                  'remove_button': {
+                      title: 'Supprimer ce tag'
+                  },
+                  // 'clear_button': { // Optionnel : ajoute un bouton pour effacer toutes les sélections
+                  //     title: 'Effacer tous les tags'
+                  // },
+                  // 'checkbox_options': {} // Optionnel : affiche des checkboxes dans la liste déroulante
+              },
+              create: false, // Pas de création de nouveaux tags à la volée, si vous voulez juste sélectionner des tags existants
+              sortField: {field: "$score", direction: "desc"}, // Trie par pertinence de la recherche
+              valueField: 'TagId', // Le champ de l'objet option qui sera la valeur (<option value="ID">)
+              labelField: 'Name',   // Le champ de l'objet option qui sera le texte (<option>Nom</option>)
+              searchField: ['Name'], // Les champs sur lesquels la recherche s'effectue
+
+              // Les options complètes de tous les tags pour Tom Select (pas seulement celles sélectionnées)
+              // Elles doivent être au format attendu par Tom Select (objets avec valueField et labelField)
+              options: allFileTags.map(tag => ({ TagId: tag.TagId, Name: tag.Name })),
+
+              // Callbacks pour mettre à jour previewDataEdited
+              onItemAdd: function(value) {
+                  // Convertir la valeur en nombre
+                  const newTagId = parseInt(value);
+                  if (isNaN(newTagId)) return;
+
+                  // Mettre à jour previewDataEdited pour la note concernée
+                  const note = previewDataEdited[table][file][index];
+                  if (!Array.isArray(note.TagIds)) {
+                      note.TagIds = [];
+                  }
+                  note.TagIds.push(newTagId);
+                  note.TagIds = [...new Set(note.TagIds)]; // Assurer l'unicité et la propreté
+
+                  console.log(`Tag ${newTagId} ajouté à note [${file}][${index}]. Nouveaux TagIds:`, note.TagIds);
+              },
+              onItemRemove: function(value) {
+                  // Convertir la valeur en nombre
+                  const removedTagId = parseInt(value);
+                  if (isNaN(removedTagId)) return;
+
+                  // Mettre à jour previewDataEdited pour la note concernée
+                  const note = previewDataEdited[table][file][index];
+                  if (Array.isArray(note.TagIds)) {
+                      note.TagIds = note.TagIds.filter(id => id !== removedTagId);
+                  }
+                  // Si la liste devient vide et que vous voulez stocker [] plutôt que [null], ajustez ici
+                  // note.TagIds = note.TagIds.length === 0 ? null : note.TagIds;
+
+                  console.log(`Tag ${removedTagId} retiré de note [${file}][${index}]. Nouveaux TagIds:`, note.TagIds);
+              }
+          });
       });
 
       const existingPdfBtn = document.getElementById("exportPdfBtn");
