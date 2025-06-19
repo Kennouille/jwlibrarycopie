@@ -1658,6 +1658,24 @@
     doc.save('notes.pdf');
   }
 
+  window.refreshNotesTab = function() {
+    return new Promise((resolve) => {
+      const startAnimationTime = Date.now();
+      setTimeout(() => {
+        buildNotesTab();
+        const elapsedBuildTime = Date.now() - startAnimationTime;
+        const remainingTime = MIN_LOAD_TIME_MS - elapsedBuildTime;
+        if (remainingTime > 0) {
+          setTimeout(() => {
+            resolve();
+          }, remainingTime);
+        } else {
+          resolve();
+        }
+      }, 0);
+    });
+  };
+
   async function showTab(tabName) {
     // Masquer tous les contenus
     document.querySelectorAll('.tab-content').forEach(tab => {
@@ -1719,27 +1737,6 @@
         }
     }
   }
-
-  window.refreshNotesTab = function() {
-    return new Promise((resolve) => {
-      const startAnimationTime = Date.now();
-      setTimeout(() => {
-        buildNotesTab();
-        const elapsedBuildTime = Date.now() - startAnimationTime;
-        const remainingTime = MIN_LOAD_TIME_MS - elapsedBuildTime;
-        if (remainingTime > 0) {
-          setTimeout(() => {
-            resolve();
-          }, remainingTime);
-        } else {
-          resolve();
-        }
-      }, 0);
-    });
-  };
-
-  // 👇 première construction immédiate de l'onglet Notes
-  buildNotesTab();
 
   document.addEventListener("click", function (e) {
     if (e.target.classList.contains("show-full-note")) {
