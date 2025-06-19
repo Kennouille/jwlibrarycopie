@@ -1625,7 +1625,7 @@
         throw new Error("Le backend n’a pas renvoyé la structure attendue pour les notes.");
       }
 
-      loadPreviewDataprocessLoadedPreviewData(previewData);  // ← ici tu montres les tabs Notes, Bookmarks, Tags, etc.
+      processLoadedPreviewData(previewData);  // ← ici tu montres les tabs Notes, Bookmarks, Tags, etc.
 
       await updateProgress(100, "Aperçu prêt", 5);
       document.getElementById('merge-summary').classList.remove('hidden');
