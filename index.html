@@ -1344,84 +1344,85 @@
       Content: "Note",
       Name: "Catégorie"
     };
+  }
 
-    // ──────────────────────────────────────────────────────────────────────────────
-    // Fonction réutilisable pour générer l’onglet Notes
-    // ──────────────────────────────────────────────────────────────────────────────
-    function buildNotesTab() {
-      console.log("buildNotesTab: Démarrage de la reconstruction de l'onglet Notes.");
-      const tabEl = document.getElementById("tab-notes");
+  // ──────────────────────────────────────────────────────────────────────────────
+  // Fonction réutilisable pour générer l’onglet Notes
+  // ──────────────────────────────────────────────────────────────────────────────
+  function buildNotesTab() {
+    console.log("buildNotesTab: Démarrage de la reconstruction de l'onglet Notes.");
+    const tabEl = document.getElementById("tab-notes");
 
-      // Calculer un hash simple des données des notes
-      // C'est une méthode simple pour détecter si les données ont changé.
-      // Une méthode plus robuste serait de hacher un JSON.stringify(previewDataEdited.notes)
-      // mais ça peut aussi être coûteux. Pour l'instant, on fait simple.
-      const currentNotesDataState = JSON.stringify(previewDataEdited.notes);
+    // Calculer un hash simple des données des notes
+    // C'est une méthode simple pour détecter si les données ont changé.
+    // Une méthode plus robuste serait de hacher un JSON.stringify(previewDataEdited.notes)
+    // mais ça peut aussi être coûteux. Pour l'instant, on fait simple.
+    const currentNotesDataState = JSON.stringify(previewDataEdited.notes);
 
-      // Si le HTML est en cache ET que les données n'ont pas changé, utilisez le cache
-      if (cachedNotesTabHTML && notesDataHash === currentNotesDataState) {
-          console.log("buildNotesTab: Chargement de l'onglet Notes depuis le cache.");
-          tabEl.innerHTML = cachedNotesTabHTML;
-          // Important : Ré-initialiser Tom Select et les autres écouteurs même si c'est depuis le cache !
-          // Car les éléments DOM ont été recréés par innerHTML
-          initializeNoteElements(); // Nouvelle fonction pour regrouper les initialisations
-          return; // Sortir de la fonction
-      }
+    // Si le HTML est en cache ET que les données n'ont pas changé, utilisez le cache
+    if (cachedNotesTabHTML && notesDataHash === currentNotesDataState) {
+        console.log("buildNotesTab: Chargement de l'onglet Notes depuis le cache.");
+        tabEl.innerHTML = cachedNotesTabHTML;
+        // Important : Ré-initialiser Tom Select et les autres écouteurs même si c'est depuis le cache !
+        // Car les éléments DOM ont été recréés par innerHTML
+        initializeNoteElements(); // Nouvelle fonction pour regrouper les initialisations
+        return; // Sortir de la fonction
+    }
 
-      console.log("buildNotesTab: Génération complète de l'onglet Notes.");
-      // --- Votre code existant pour générer le HTML ---
-      const contents = previewDataEdited.notes;
-      const fieldsToKeep = ["Title", "Content"];
-      const maxLength = Math.max(contents.file1.length, contents.file2.length);
+    console.log("buildNotesTab: Génération complète de l'onglet Notes.");
+    // --- Votre code existant pour générer le HTML ---
+    const contents = previewDataEdited.notes;
+    const fieldsToKeep = ["Title", "Content"];
+    const maxLength = Math.max(contents.file1.length, contents.file2.length);
 
-      const generatedHTML = `
-          <table style="width: 100%; border-collapse: collapse;">
-              <thead>
-                  <tr style="background-color: #f0f0f0;">
-                      <th style="width: 33%; padding: 8px;">📂 Fichier 1</th>
-                      <th style="width: 33%; padding: 8px;">📂 Fichier 2</th>
-                      <th style="width: 34%; padding: 8px;">✅ Choix</th>
-                  </tr>
-              </thead>
-              <tbody>
-                  ${Array.from({ length: maxLength }).map((_, index) => {
-                      const item1 = contents.file1[index] || {};
-                      const item2 = contents.file2[index] || {};
+    const generatedHTML = `
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background-color: #f0f0f0;">
+                    <th style="width: 33%; padding: 8px;">📂 Fichier 1</th>
+                    <th style="width: 33%; padding: 8px;">📂 Fichier 2</th>
+                    <th style="width: 34%; padding: 8px;">✅ Choix</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${Array.from({ length: maxLength }).map((_, index) => {
+                    const item1 = contents.file1[index] || {};
+                    const item2 = contents.file2[index] || {};
 
-                      const html1 = fieldsToKeep.map(field =>
-                          renderEditableField("notes", "file1", index, field, item1[field], labels)
-                      ).join("");
+                    const html1 = fieldsToKeep.map(field =>
+                        renderEditableField("notes", "file1", index, field, item1[field], labels)
+                    ).join("");
 
-                      const html2 = fieldsToKeep.map(field =>
-                          renderEditableField("notes", "file2", index, field, item2[field], labels)
-                      ).join("");
+                    const html2 = fieldsToKeep.map(field =>
+                        renderEditableField("notes", "file2", index, field, item2[field], labels)
+                    ).join("");
 
-                      return `
-                          <tr>
-                              <td style="padding: 6px; border: 1px solid #ccc;">${html1}</td>
-                              <td style="padding: 6px; border: 1px solid #ccc;">${html2}</td>
-                              <td style="padding: 6px; border: 1px solid #ccc;">
-                                  <select data-table="notes" data-index="${index}" class="merge-choice">
-                                      <option value="both">Garder les deux</option>
-                                      <option value="file1">Garder fichier 1</option>
-                                      <option value="file2">Garder fichier 2</option>
-                                      <option value="ignore">Ignorer</option>
-                                  </select>
-                              </td>
-                          </tr>`;
-                  }).join("")}
-              </tbody>
-          </table>
-      `;
+                    return `
+                        <tr>
+                            <td style="padding: 6px; border: 1px solid #ccc;">${html1}</td>
+                            <td style="padding: 6px; border: 1px solid #ccc;">${html2}</td>
+                            <td style="padding: 6px; border: 1px solid #ccc;">
+                                <select data-table="notes" data-index="${index}" class="merge-choice">
+                                    <option value="both">Garder les deux</option>
+                                    <option value="file1">Garder fichier 1</option>
+                                    <option value="file2">Garder fichier 2</option>
+                                    <option value="ignore">Ignorer</option>
+                                </select>
+                            </td>
+                        </tr>`;
+                }).join("")}
+            </tbody>
+        </table>
+    `;
 
-      tabEl.innerHTML = generatedHTML; // Insérer le HTML généré
+    tabEl.innerHTML = generatedHTML; // Insérer le HTML généré
 
-      // Stocker le HTML et le hash pour le caching futur
-      cachedNotesTabHTML = generatedHTML;
-      notesDataHash = currentNotesDataState;
+    // Stocker le HTML et le hash pour le caching futur
+    cachedNotesTabHTML = generatedHTML;
+    notesDataHash = currentNotesDataState;
 
-      // Initialiser tous les éléments interactifs APRÈS que le HTML est dans le DOM
-      initializeNoteElements();
+    // Initialiser tous les éléments interactifs APRÈS que le HTML est dans le DOM
+    initializeNoteElements();
   }
 
   function initializeNoteElements() {
