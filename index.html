@@ -2078,19 +2078,29 @@
 
           // ⚠️ ATTENTION : collectez TOUS les select de tags pour la note actuelle,
           // puis filtrez-les par data-file.
-          document.querySelectorAll(`.note-tags-select[data-index="${index}"]`).forEach(tagSelect => {
-              const tagId = parseInt(tagSelect.value); // Récupère le TagId sélectionné (ou NaN)
-              if (isNaN(tagId) || tagId === 0) { // 0 pourrait être "Aucune catégorie"
-                  // Ignore les sélections invalides ou "aucune catégorie"
-                  return;
-              }
+          document.querySelectorAll(`.note-tags-select[data-index="${index}"]`).forEach(selectElement => {
+              // Accédez à l'instance Tom Select attachée à l'élément DOM
+              const tomSelectInstance = selectElement.tomselect; // C'est ici que l'instance est stockée par Tom Select
 
-              const sourceFile = tagSelect.dataset.file; // 'file1' ou 'file2'
+              if (tomSelectInstance) {
+                  // Récupérez les valeurs sélectionnées par Tom Select.
+                  // getValue() retourne une chaîne pour un select simple, ou un tableau de chaînes pour un multi-select.
+                  const selectedValues = tomSelectInstance.getValue();
 
-              if (sourceFile === 'file1') {
-                  collectedTagIdsFile1.push(tagId);
-              } else if (sourceFile === 'file2') {
-                  collectedTagIdsFile2.push(tagId);
+                  // Convertissez la ou les valeurs en un tableau d'IDs numériques
+                  const tagIdsForThisSelect = Array.isArray(selectedValues) ?
+                      selectedValues.map(id => parseInt(id)).filter(id => !isNaN(id) && id !== 0) :
+                      (selectedValues ? [parseInt(selectedValues)].filter(id => !isNaN(id) && id !== 0) : []);
+
+                  const sourceFile = selectElement.dataset.file; // 'file1' ou 'file2'
+
+                  if (sourceFile === 'file1') {
+                      collectedTagIdsFile1.push(...tagIdsForThisSelect);
+                  } else if (sourceFile === 'file2') {
+                      collectedTagIdsFile2.push(...tagIdsForThisSelect);
+                  }
+              } else {
+                  console.warn(`Tom Select instance non trouvée pour l'élément avec data-index="${index}" et data-file="${selectElement.dataset.file}".`);
               }
           });
 
