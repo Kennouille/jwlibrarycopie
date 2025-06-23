@@ -1574,77 +1574,45 @@ def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, loca
         """)
         conn.commit()
 
-        # Récupération du max TagId existant
+        # Fusion des Tags
         cursor.execute("SELECT COALESCE(MAX(TagId), 0) FROM Tag")
         max_tag_id = cursor.fetchone()[0]
         tag_id_map = {}
 
-        # --- Fusion des Tags (inchangé) ---
-        def fetch_tags(db_path):
-            with sqlite3.connect(db_path) as c:
-                cur = c.cursor()
-                cur.execute("SELECT TagId, Type, Name FROM Tag")
-                return cur.fetchall()
+        for db_path in [file1_db, file2_db]:
+            with sqlite3.connect(db_path) as src_conn:
+                src_cursor = src_conn.cursor()
+                src_cursor.execute("SELECT TagId, Type, Name FROM Tag")
+                for tag_id, tag_type, tag_name in src_cursor.fetchall():
+                    # Vérifiez si ce tag_id de source a déjà été mappé.
+                    # Cela gère les cas où un tag est commun aux deux fichiers
+                    # ou a déjà été traité d'une manière ou d'une autre.
+                    cursor.execute("SELECT NewTagId FROM MergeMapping_Tag WHERE SourceDb = ? AND OldTagId = ?",
+                                   (db_path, tag_id))
+                    res = cursor.fetchone()
+                    if res:
+                        tag_id_map[(db_path, tag_id)] = res[0]
+                        continue  # Passe au tag suivant si déjà mappé
 
-        tags1 = fetch_tags(file1_db)
-        tags2 = fetch_tags(file2_db)
-        max_len = max(len(tags1), len(tags2))
+                    # Chercher si un tag avec le même Type et Name existe déjà dans la base fusionnée
+                    cursor.execute("SELECT TagId FROM Tag WHERE Type = ? AND Name = ?", (tag_type, tag_name))
+                    existing = cursor.fetchone()
+                    if existing:
+                        new_tag_id = existing[0]  # Utiliser l'ID du tag existant
+                    else:
+                        # Si le tag n'existe pas, créer un nouvel ID et l'insérer
+                        max_tag_id += 1
+                        new_tag_id = max_tag_id
+                        cursor.execute("INSERT INTO Tag (TagId, Type, Name) VALUES (?, ?, ?)",
+                                       (new_tag_id, tag_type, tag_name))
 
-        for index in range(max_len):
-            tag1 = tags1[index] if index < len(tags1) else None
-            tag2 = tags2[index] if index < len(tags2) else None
+                    # Mapper l'ancien TagId de la source vers le nouveau TagId dans la DB fusionnée
+                    tag_id_map[(db_path, tag_id)] = new_tag_id
 
-            choice_data = tag_choices.get(str(index), "file1")
-            if isinstance(choice_data, str):
-                choice, edited = choice_data, {}
-            else:
-                choice = choice_data.get("choice", "file1")
-                edited = choice_data.get("edited", {})
-
-            to_insert = []
-            if choice == "file1" and tag1:
-                to_insert = [(tag1, file1_db)]
-            elif choice == "file2" and tag2:
-                to_insert = [(tag2, file2_db)]
-            elif choice == "both":
-                if tag1: to_insert.append((tag1, file1_db))
-                if tag2: to_insert.append((tag2, file2_db))
-            elif choice == "ignore":
-                continue
-
-            for (tag_id, tag_type, tag_name), db_path in to_insert:
-                source_key = "file1" if os.path.normpath(db_path) == os.path.normpath(file1_db) else "file2"
-                tag_name = edited.get(source_key, {}).get("Name", tag_name)  # Ligne cruciale pour Tom Select
-
-                cursor.execute(
-                    "SELECT NewTagId FROM MergeMapping_Tag WHERE SourceDb=? AND OldTagId=?",
-                    (db_path, tag_id)
-                )
-                res = cursor.fetchone()
-                if res:
-                    tag_id_map[(db_path, tag_id)] = res[0]
-                    continue
-
-                cursor.execute(
-                    "SELECT TagId FROM Tag WHERE Type=? AND Name=?",
-                    (tag_type, tag_name)
-                )
-                existing = cursor.fetchone()
-                if existing:
-                    new_tag_id = existing[0]
-                else:
-                    max_tag_id += 1
-                    new_tag_id = max_tag_id
-                    cursor.execute(
-                        "INSERT INTO Tag (TagId, Type, Name) VALUES (?, ?, ?)",
-                        (new_tag_id, tag_type, tag_name)
-                    )
-
-                tag_id_map[(db_path, tag_id)] = new_tag_id
-                cursor.execute(
-                    "INSERT INTO MergeMapping_Tag (SourceDb, OldTagId, NewTagId) VALUES (?, ?, ?)",
-                    (db_path, tag_id, new_tag_id)
-                )
+                    # Enregistrer le mapping dans la table temporaire MergeMapping_Tag
+                    cursor.execute("INSERT INTO MergeMapping_Tag (SourceDb, OldTagId, NewTagId) VALUES (?, ?, ?)",
+                                   (db_path, tag_id, new_tag_id))
+        # Fin de la section de fusion des Tags
 
         # 🔧 Normalisation des chemins pour note_mapping
         normalized_note_mapping = {
