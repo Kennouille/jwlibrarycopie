@@ -2431,14 +2431,32 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
                         flush=True)
 
                     for tag_id in selected_tags:
-                        # Mappe l'ancien TagId (du fichier source) au nouveau TagId (dans la DB fusionnée)
-                        # Il faut utiliser le chemin de la source originale pour récupérer le bon tag_id_map
+                        new_tag_id = None
+
+                        # Tenter d'abord de trouver le tag_id via le mapping (ancien ID -> nouvel ID)
+                        # Cette ligne gère le cas où le frontend envoie l'ID original du fichier source
                         mapped_tag_id_key = (current_source_db, tag_id)
                         new_tag_id = tag_id_map.get(mapped_tag_id_key)
 
-                        if new_tag_id is None:  # Si le tag n'a pas été fusionné ou n'existe pas dans le map
+                        # Si le mapping n'a rien donné, cela signifie peut-être que Tom Select
+                        # a déjà renvoyé le "nouvel" ID (celui de la DB fusionnée)
+                        # dans ce cas, nous devrions le considérer directement comme le new_tag_id
+                        if new_tag_id is None:
+                            # Vérifier si le tag_id reçu est directement un ID existant dans la table Tag fusionnée
+                            cursor.execute("SELECT TagId FROM Tag WHERE TagId = ?", (tag_id,))
+                            if cursor.fetchone():
+                                new_tag_id = tag_id  # Oui, c'est déjà un ID valide dans la DB fusionnée
+                            else:
+                                # Sinon, vérifier si c'est un tag_id qui a été fusionné et est devenu un des *valeurs* de tag_id_map
+                                # C'est pour le cas où l'ID original n'était pas dans la source actuelle mais est un ID fusionné existant
+                                for (db, old_id), new_id in tag_id_map.items():
+                                    if tag_id == new_id:
+                                        new_tag_id = new_id
+                                        break
+
+                        if new_tag_id is None:  # Si le tag n'a pas été trouvé après toutes les tentatives
                             print(
-                                f"⚠️ TagId original {tag_id} de {os.path.basename(current_source_db)} non trouvé dans tag_id_map. Non appliqué à NoteId {new_note_id}.",
+                                f"⚠️ TagId '{tag_id}' (provenant de {os.path.basename(current_source_db)}) n'a pas pu être mappé à un TagId fusionné. Non appliqué à NoteId {new_note_id}.",
                                 flush=True)
                             continue
 
@@ -2492,13 +2510,32 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
                     flush=True)
 
                 for tag_id in selected_tags:
-                    # Mappe l'ancien TagId (du fichier source) au nouveau TagId (dans la DB fusionnée)
+                    new_tag_id = None
+
+                    # Tenter d'abord de trouver le tag_id via le mapping (ancien ID -> nouvel ID)
+                    # Cette ligne gère le cas où le frontend envoie l'ID original du fichier source
                     mapped_tag_id_key = (current_source_db, tag_id)
                     new_tag_id = tag_id_map.get(mapped_tag_id_key)
 
-                    if new_tag_id is None:  # Si le tag n'a pas été fusionné ou n'existe pas dans le map
+                    # Si le mapping n'a rien donné, cela signifie peut-être que Tom Select
+                    # a déjà renvoyé le "nouvel" ID (celui de la DB fusionnée)
+                    # dans ce cas, nous devrions le considérer directement comme le new_tag_id
+                    if new_tag_id is None:
+                        # Vérifier si le tag_id reçu est directement un ID existant dans la table Tag fusionnée
+                        cursor.execute("SELECT TagId FROM Tag WHERE TagId = ?", (tag_id,))
+                        if cursor.fetchone():
+                            new_tag_id = tag_id  # Oui, c'est déjà un ID valide dans la DB fusionnée
+                        else:
+                            # Sinon, vérifier si c'est un tag_id qui a été fusionné et est devenu un des *valeurs* de tag_id_map
+                            # C'est pour le cas où l'ID original n'était pas dans la source actuelle mais est un ID fusionné existant
+                            for (db, old_id), new_id in tag_id_map.items():
+                                if tag_id == new_id:
+                                    new_tag_id = new_id
+                                    break
+
+                    if new_tag_id is None:  # Si le tag n'a pas été trouvé après toutes les tentatives
                         print(
-                            f"⚠️ TagId original {tag_id} de {os.path.basename(current_source_db)} non trouvé dans tag_id_map. Non appliqué à NoteId {new_note_id}.",
+                            f"⚠️ TagId '{tag_id}' (provenant de {os.path.basename(current_source_db)}) n'a pas pu être mappé à un TagId fusionné. Non appliqué à NoteId {new_note_id}.",
                             flush=True)
                         continue
 
