@@ -1193,7 +1193,9 @@
                       labelField: 'Name',
                       searchField: ['Name'],
 
-                      options: allFileTags.map(tag => ({ TagId: tag.TagId, Name: tag.Name })),
+                      options: allFileTags
+                        .filter(tag => tag && typeof tag.TagId === 'number' && typeof tag.Name === 'string') // Filtrez les tags invalides
+                        .map(tag => ({ TagId: tag.TagId, Name: tag.Name })),
 
                       // Maintenez les handlers onItemAdd/onItemRemove ici, ils sont importants pour l'interactivité
                       onItemAdd: function(value) {
@@ -1243,7 +1245,9 @@
                               labelField: 'Name',
                               searchField: ['Name'],
 
-                              options: allFileTags.map(tag => ({ TagId: tag.TagId, Name: tag.Name })),
+                              options: allFileTags
+                                .filter(tag => tag && typeof tag.TagId === 'number' && typeof tag.Name === 'string') // Filtrez les tags invalides
+                                .map(tag => ({ TagId: tag.TagId, Name: tag.Name })),
 
                               onItemAdd: function(value) {
                                   const newTagId = parseInt(value);
