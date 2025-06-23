@@ -1160,78 +1160,131 @@
   }
 
   // Variable globale pour stocker l'observer
-  let tomSelectObserver = null;
+  let tomSelectObserver;
 
-  function initializeTomSelectsLazily() {
-      // Si un observer existe déjà, déconnectez-le pour éviter les fuites de mémoire
+  function initializeTomSelectsLazily(forceAll = false) {
+      // Si un observer existe, déconnectez-le pour éviter les fuites de mémoire
+      // ou si on force l'initialisation de tout le monde, on n'a plus besoin de l'observer.
       if (tomSelectObserver) {
           tomSelectObserver.disconnect();
+          tomSelectObserver = null; // Réinitialiser l'observer
       }
 
-      // Créez un nouvel observer
-      tomSelectObserver = new IntersectionObserver((entries, observer) => {
-          entries.forEach(entry => {
-              // Si l'élément est visible
-              if (entry.isIntersecting) {
-                  const el = entry.target;
-                  // Vérifiez si Tom Select n'a pas déjà été initialisé
-                  if (!el.classList.contains('tomselected')) { // Tom Select ajoute cette classe après initialisation
-                      const { table, file, index, noteid } = el.dataset;
-                      const allFileTags = previewDataEdited.tags[file] || [];
+      // Ciblez tous les éléments Tom Select potentiels
+      const elementsToInitialize = document.querySelectorAll(".note-tags-tomselect");
 
-                      new TomSelect(el, {
-                          plugins: {
-                              'remove_button': {
-                                  title: 'Supprimer ce tag'
-                              },
+      if (forceAll) {
+          // Initialiser tous les éléments immédiatement, bypassant l'IntersectionObserver
+          elementsToInitialize.forEach(el => {
+              // Vérifiez si Tom Select n'a pas déjà été initialisé
+              if (!el.classList.contains('tomselected') && !el.tomselect) { // Tom Select ajoute 'tomselected' et son instance à 'el.tomselect'
+                  const { table, file, index, noteid } = el.dataset;
+                  const allFileTags = previewDataEdited.tags[file] || [];
+
+                  new TomSelect(el, {
+                      plugins: {
+                          'remove_button': {
+                              title: 'Supprimer ce tag'
                           },
-                          create: false,
-                          sortField: {field: "$score", direction: "desc"},
-                          valueField: 'TagId',
-                          labelField: 'Name',
-                          searchField: ['Name'],
+                      },
+                      create: false,
+                      sortField: {field: "$score", direction: "desc"},
+                      valueField: 'TagId',
+                      labelField: 'Name',
+                      searchField: ['Name'],
 
-                          options: allFileTags.map(tag => ({ TagId: tag.TagId, Name: tag.Name })),
+                      options: allFileTags.map(tag => ({ TagId: tag.TagId, Name: tag.Name })),
 
-                          onItemAdd: function(value) {
-                              const newTagId = parseInt(value);
-                              if (isNaN(newTagId)) return;
-                              const note = previewDataEdited[table][file][index];
-                              if (!Array.isArray(note.TagIds)) { note.TagIds = []; }
-                              note.TagIds.push(newTagId);
-                              note.TagIds = [...new Set(note.TagIds)];
-                              invalidateNotesCache();
-                              console.log(`[LAZY TS ADD] Tag ${newTagId} ajouté à note [${file}][${index}]. Nouveaux TagIds:`, note.TagIds);
-                          },
-                          onItemRemove: function(value) {
-                              const removedTagId = parseInt(value);
-                              if (isNaN(removedTagId)) return;
-                              const note = previewDataEdited[table][file][index];
-                              if (Array.isArray(note.TagIds)) {
-                                  note.TagIds = note.TagIds.filter(id => id !== removedTagId);
-                              }
-                              invalidateNotesCache();
-                              console.log(`[LAZY TS REMOVE] Tag ${removedTagId} retiré de note [${file}][${index}]. Nouveaux TagIds:`, note.TagIds);
+                      // Maintenez les handlers onItemAdd/onItemRemove ici, ils sont importants pour l'interactivité
+                      onItemAdd: function(value) {
+                          const newTagId = parseInt(value);
+                          if (isNaN(newTagId)) return;
+                          const note = previewDataEdited[table][file][index];
+                          if (!Array.isArray(note.TagIds)) { note.TagIds = []; }
+                          note.TagIds.push(newTagId);
+                          note.TagIds = [...new Set(note.TagIds)];
+                          invalidateNotesCache();
+                          console.log(`[LAZY TS ADD] Tag ${newTagId} ajouté à note [${file}][${index}]. Nouveaux TagIds:`, note.TagIds);
+                      },
+                      onItemRemove: function(value) {
+                          const removedTagId = parseInt(value);
+                          if (isNaN(removedTagId)) return;
+                          const note = previewDataEdited[table][file][index];
+                          if (Array.isArray(note.TagIds)) {
+                              note.TagIds = note.TagIds.filter(id => id !== removedTagId);
                           }
-                      });
-                  }
-                  // Une fois initialisé, on n'a plus besoin d'observer cet élément
-                  observer.unobserve(el);
+                          invalidateNotesCache();
+                          console.log(`[LAZY TS REMOVE] Tag ${removedTagId} retiré de note [${file}][${index}]. Nouveaux TagIds:`, note.TagIds);
+                      }
+                  });
               }
           });
-      }, {
-          root: null, // utilise le viewport comme conteneur racine
-          rootMargin: '0px', // ou '200px' pour précharger un peu plus tôt
-          threshold: 0.1 // L'élément est considéré comme visible dès que 10% de sa surface est visible
-      });
+      } else {
+          // Logique standard d'initialisation paresseuse avec IntersectionObserver
+          tomSelectObserver = new IntersectionObserver((entries, observer) => {
+              entries.forEach(entry => {
+                  // Si l'élément est visible
+                  if (entry.isIntersecting) {
+                      const el = entry.target;
+                      // Vérifiez si Tom Select n'a pas déjà été initialisé
+                      if (!el.classList.contains('tomselected') && !el.tomselect) {
+                          const { table, file, index, noteid } = el.dataset;
+                          const allFileTags = previewDataEdited.tags[file] || [];
 
-      // Ciblez tous les éléments Tom Select non initialisés pour l'observation
-      document.querySelectorAll(".note-tags-tomselect").forEach(el => {
-          // S'il n'a pas déjà la classe 'tomselected', cela signifie qu'il n'est pas initialisé
-          if (!el.classList.contains('tomselected')) {
-              tomSelectObserver.observe(el);
-          }
-      });
+                          new TomSelect(el, {
+                              plugins: {
+                                  'remove_button': {
+                                      title: 'Supprimer ce tag'
+                                  },
+                              },
+                              create: false,
+                              sortField: {field: "$score", direction: "desc"},
+                              valueField: 'TagId',
+                              labelField: 'Name',
+                              searchField: ['Name'],
+
+                              options: allFileTags.map(tag => ({ TagId: tag.TagId, Name: tag.Name })),
+
+                              onItemAdd: function(value) {
+                                  const newTagId = parseInt(value);
+                                  if (isNaN(newTagId)) return;
+                                  const note = previewDataEdited[table][file][index];
+                                  if (!Array.isArray(note.TagIds)) { note.TagIds = []; }
+                                  note.TagIds.push(newTagId);
+                                  note.TagIds = [...new Set(note.TagIds)];
+                                  invalidateNotesCache();
+                                  console.log(`[LAZY TS ADD] Tag ${newTagId} ajouté à note [${file}][${index}]. Nouveaux TagIds:`, note.TagIds);
+                              },
+                              onItemRemove: function(value) {
+                                  const removedTagId = parseInt(value);
+                                  if (isNaN(removedTagId)) return;
+                                  const note = previewDataEdited[table][file][index];
+                                  if (Array.isArray(note.TagIds)) {
+                                      note.TagIds = note.TagIds.filter(id => id !== removedTagId);
+                                  }
+                                  invalidateNotesCache();
+                                  console.log(`[LAZY TS REMOVE] Tag ${removedTagId} retiré de note [${file}][${index}]. Nouveaux TagIds:`, note.TagIds);
+                              }
+                          });
+                      }
+                      // Une fois initialisé (ou si déjà initialisé), on n'a plus besoin d'observer cet élément
+                      observer.unobserve(el);
+                  }
+              });
+          }, {
+              root: null, // utilise le viewport comme conteneur racine
+              rootMargin: '0px', // ou '200px' pour précharger un peu plus tôt
+              threshold: 0.1 // L'élément est considéré comme visible dès que 10% de sa surface est visible
+          });
+
+          // Ciblez tous les éléments Tom Select non initialisés pour l'observation
+          elementsToInitialize.forEach(el => {
+              // S'il n'a pas déjà la classe 'tomselected', cela signifie qu'il n'est pas initialisé
+              if (!el.classList.contains('tomselected') && !el.tomselect) {
+                  tomSelectObserver.observe(el);
+              }
+          });
+      }
   }
 
   function initializeNoteElements() {
@@ -1951,25 +2004,19 @@
     }
   }
 
-
   async function startMerge() {
     try {
       const file1 = document.getElementById('file1').files[0];
       const file2 = document.getElementById('file2').files[0];
       let localDatetime = document.getElementById('local_datetime').value;
 
-      // Si le champ input est vide, générez la date/heure locale actuelle
       if (!localDatetime) {
           const now = new Date();
-          // Format ISO 8601 pour un datetime-local input (YYYY-MM-DDTHH:MM)
-          // On doit prendre soin des fuseaux horaires si on veut vraiment "local",
-          // mais pour un simple envoi, un format standard est suffisant.
           const year = now.getFullYear();
-          const month = String(now.getMonth() + 1).padStart(2, '0'); // Mois est 0-indexé
+          const month = String(now.getMonth() + 1).padStart(2, '0');
           const day = String(now.getDate()).padStart(2, '0');
           const hours = String(now.getHours()).padStart(2, '0');
           const minutes = String(now.getMinutes()).padStart(2, '0');
-
           localDatetime = `${year}-${month}-${day}T${hours}:${minutes}`;
       }
 
@@ -2052,6 +2099,9 @@
       progressBar.classList.add('progress-bar-animated');
       document.getElementById('construction-container').classList.remove('hidden');
 
+      // NOUVEAU : Forcer l'initialisation de TOUS les Tom Selects, visibles ou non.
+      initializeTomSelectsLazily(true);
+
       const choices = { notes: {}, bookmarks: {}, tags: {} };
       document.querySelectorAll(".merge-choice").forEach(select => {
         const table = select.dataset.table;
@@ -2071,28 +2121,21 @@
         };
 
         if (table === "notes") {
-          // Initialisez les listes pour stocker les TagIds COLLECTÉS par l'utilisateur
-          // pour les deux fichiers de la note courante.
           const collectedTagIdsFile1 = [];
           const collectedTagIdsFile2 = [];
 
-          // ⚠️ ATTENTION : collectez TOUS les select de tags pour la note actuelle,
-          // puis filtrez-les par data-file.
+          // Le sélecteur est bien '.note-tags-tomselect'
+          // Et maintenant, l'instance devrait être présente grâce à l'initialisation forcée.
           document.querySelectorAll(`.note-tags-tomselect[data-index="${index}"]`).forEach(selectElement => {
-              // Accédez à l'instance Tom Select attachée à l'élément DOM
-              const tomSelectInstance = selectElement.tomselect; // C'est ici que l'instance est stockée par Tom Select
+              const tomSelectInstance = selectElement.tomselect;
 
               if (tomSelectInstance) {
-                  // Récupérez les valeurs sélectionnées par Tom Select.
-                  // getValue() retourne une chaîne pour un select simple, ou un tableau de chaînes pour un multi-select.
                   const selectedValues = tomSelectInstance.getValue();
-
-                  // Convertissez la ou les valeurs en un tableau d'IDs numériques
                   const tagIdsForThisSelect = Array.isArray(selectedValues) ?
                       selectedValues.map(id => parseInt(id)).filter(id => !isNaN(id) && id !== 0) :
                       (selectedValues ? [parseInt(selectedValues)].filter(id => !isNaN(id) && id !== 0) : []);
 
-                  const sourceFile = selectElement.dataset.file; // 'file1' ou 'file2'
+                  const sourceFile = selectElement.dataset.file;
 
                   if (sourceFile === 'file1') {
                       collectedTagIdsFile1.push(...tagIdsForThisSelect);
@@ -2100,11 +2143,11 @@
                       collectedTagIdsFile2.push(...tagIdsForThisSelect);
                   }
               } else {
-                  console.warn(`Tom Select instance non trouvée pour l'élément avec data-index="${index}" et data-file="${selectElement.dataset.file}".`);
+                  // Ce message d'avertissement NE DEVRAIT PLUS apparaître si l'initialisation forcée a fonctionné correctement.
+                  console.warn(`Tom Select instance non trouvée pour l'élément avec data-index="${index}" et data-file="${selectElement.dataset.file}". (APRES INITIALISATION FORCEE)`);
               }
           });
 
-          // 📌 Ajoute les NoteId réels (utiles pour le backend fiable)
           const noteObj1 = previewDataEdited.notes.file1?.[index];
           const noteObj2 = previewDataEdited.notes.file2?.[index];
           const noteId1 = noteObj1?.NoteId;
@@ -2114,31 +2157,19 @@
           if (noteId1) choices[table][index].noteIds.file1 = noteId1;
           if (noteId2) choices[table][index].noteIds.file2 = noteId2;
 
-          const choice = value; // C'est le choix de fusion pour la note entière ("both", "file1", "file2", "ignore")
+          const choice = value;
 
           if (choice === "both") {
-              // Pour "both", fusionnez les tags COLLECTÉS des deux fichiers et assurez l'unicité
               const merged = [...new Set([...collectedTagIdsFile1, ...collectedTagIdsFile2])];
               choices[table][index].selectedTags = merged;
           } else {
-              // Pour "file1" ou "file2", stockez les tags COLLECTÉS pour la source choisie
               if (!choices[table][index].selectedTagsPerSource)
                   choices[table][index].selectedTagsPerSource = {};
               choices[table][index].selectedTagsPerSource[choice] =
                   choice === "file1" ? collectedTagIdsFile1 : collectedTagIdsFile2;
           }
-
-          // --- GESTION DU BRUIT DANS LE JSON (TagIds sous edited) ---
-          // Il est probable que le `TagIds` que vous voyez sous `edited.file1` et `edited.file2`
-          // provienne du `previewDataEdited` initial.
-          // Le backend ne devrait pas avoir besoin de ces TagIds là si vous envoyez `selectedTags` ou `selectedTagsPerSource`.
-          // Il faudrait nettoyer l'objet `edited` avant de l'envoyer,
-          // ou s'assurer que le backend ignore ces `TagIds` sous `edited`.
-          // Pour l'instant, laissons-le mais gardons-le à l'esprit si le JSON reste "bruité".
-          // Le plus important est que `selectedTags` ou `selectedTagsPerSource` soit correct.
         }
 
-        // 📌 Ajoute les BookmarkId réels
         if (table === "bookmarks") {
           const bookmarkObj1 = previewDataEdited.bookmarks.file1?.[index];
           const bookmarkObj2 = previewDataEdited.bookmarks.file2?.[index];
