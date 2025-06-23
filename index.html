@@ -2078,7 +2078,7 @@
 
           // ⚠️ ATTENTION : collectez TOUS les select de tags pour la note actuelle,
           // puis filtrez-les par data-file.
-          document.querySelectorAll(`.note-tags-select[data-index="${index}"]`).forEach(selectElement => {
+          document.querySelectorAll(`.note-tags-tomselect[data-index="${index}"]`).forEach(selectElement => {
               // Accédez à l'instance Tom Select attachée à l'élément DOM
               const tomSelectInstance = selectElement.tomselect; // C'est ici que l'instance est stockée par Tom Select
 
