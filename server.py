@@ -2372,8 +2372,14 @@ def merge_platform_metadata(merged_db_path, db1_path, db2_path):
 
 def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_mapping, tag_id_map):
     print("\n[🔁 APPLICATION DES selectedTags — VERSION FIABLE AVEC ID RÉELS]", flush=True)
-    # Debug print, peut être commenté en production
-    # print("Données reçues par le backend:", note_choices, flush=True)
+
+    # *** AJOUTEZ CE PRINT ICI pour voir si les données arrivent bien ***
+    print(f"DEBUG: apply_selected_tags - Entrée de la fonction. note_choices reçu: {len(note_choices)} entrées.",
+          flush=True)
+    if note_choices:  # Affichez un extrait si ce n'est pas vide
+        print(f"DEBUG: apply_selected_tags - Exemple de note_choices: {list(note_choices.items())[:2]}", flush=True)
+    else:
+        print("DEBUG: apply_selected_tags - note_choices est vide ou None.", flush=True)
 
     with sqlite3.connect(merged_db_path) as conn:
         cursor = conn.cursor()
@@ -2384,6 +2390,9 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
         normalized_db2_path = os.path.normpath(db2_path)
 
         for index_str, note_data in note_choices.items():
+            # *** AJOUTEZ CE PRINT ICI pour voir si la boucle démarre ***
+            print(f"DEBUG: Traitement de l'entrée {index_str} de note_choices.", flush=True)
+
             if not isinstance(note_data, dict):
                 print(f"⚠️ Données de note inattendues pour l'index '{index_str}': {note_data}", flush=True)
                 continue
@@ -2393,6 +2402,9 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
                 print(f"⏩ Note {index_str} ignorée par choix utilisateur. Tags non appliqués.", flush=True)
                 continue
 
+            # *** AJOUTEZ CE PRINT ICI pour voir le choix et les note_ids ***
+            print(f"DEBUG: Note {index_str} - Choix: '{choice}', Note IDs: {note_data.get('noteIds')}", flush=True)
+
             note_ids = note_data.get("noteIds", {})
             if not isinstance(note_ids, dict):
                 print(f"⚠️ 'noteIds' invalide pour l'index '{index_str}': {note_ids}", flush=True)
@@ -2401,6 +2413,8 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
             # === Cas "both" → un seul tableau selectedTags à appliquer aux deux notes ===
             if choice == "both":
                 selected_tags = note_data.get("selectedTags", [])
+                # *** AJOUTEZ CE PRINT ICI pour voir les tags sélectionnés dans le cas 'both' ***
+                print(f"DEBUG: Note {index_str} (both) - Selected Tags: {selected_tags}", flush=True)
                 if not isinstance(selected_tags, list):
                     print(f"⚠️ 'selectedTags' invalide pour le choix 'both' de l'index '{index_str}': {selected_tags}",
                           flush=True)
@@ -2418,6 +2432,11 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
                     # Utilisation de la version normalisée pour la recherche
                     new_note_id = note_mapping.get((current_source_db, old_note_id))
 
+                    # *** AJOUTEZ CE PRINT ICI pour voir si le new_note_id est trouvé ***
+                    print(
+                        f"DEBUG: Note {index_str} (both, {source}) - old_note_id: {old_note_id}, new_note_id: {new_note_id}",
+                        flush=True)
+
                     if not new_note_id:
                         print(
                             f"⛔ Nouvelle NoteId introuvable pour la note originale {old_note_id} de {os.path.basename(current_source_db)}. Tags non appliqués.",
@@ -2431,30 +2450,24 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
                         flush=True)
 
                     for tag_id in selected_tags:
+                        # ... (le reste de votre logique d'insertion des tags, y compris la nouvelle logique de mapping)
+                        # Assurez-vous que les prints de "📝 Tag ... appliqué" sont toujours là
                         new_tag_id = None
-
                         # Tenter d'abord de trouver le tag_id via le mapping (ancien ID -> nouvel ID)
-                        # Cette ligne gère le cas où le frontend envoie l'ID original du fichier source
                         mapped_tag_id_key = (current_source_db, tag_id)
                         new_tag_id = tag_id_map.get(mapped_tag_id_key)
 
-                        # Si le mapping n'a rien donné, cela signifie peut-être que Tom Select
-                        # a déjà renvoyé le "nouvel" ID (celui de la DB fusionnée)
-                        # dans ce cas, nous devrions le considérer directement comme le new_tag_id
                         if new_tag_id is None:
-                            # Vérifier si le tag_id reçu est directement un ID existant dans la table Tag fusionnée
                             cursor.execute("SELECT TagId FROM Tag WHERE TagId = ?", (tag_id,))
                             if cursor.fetchone():
-                                new_tag_id = tag_id  # Oui, c'est déjà un ID valide dans la DB fusionnée
+                                new_tag_id = tag_id
                             else:
-                                # Sinon, vérifier si c'est un tag_id qui a été fusionné et est devenu un des *valeurs* de tag_id_map
-                                # C'est pour le cas où l'ID original n'était pas dans la source actuelle mais est un ID fusionné existant
                                 for (db, old_id), new_id in tag_id_map.items():
                                     if tag_id == new_id:
                                         new_tag_id = new_id
                                         break
 
-                        if new_tag_id is None:  # Si le tag n'a pas été trouvé après toutes les tentatives
+                        if new_tag_id is None:
                             print(
                                 f"⚠️ TagId '{tag_id}' (provenant de {os.path.basename(current_source_db)}) n'a pas pu être mappé à un TagId fusionné. Non appliqué à NoteId {new_note_id}.",
                                 flush=True)
@@ -2463,7 +2476,7 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
                         # Trouver une position disponible pour le TagMap
                         cursor.execute("""
                             SELECT COALESCE(MAX(Position), 0) + 1 FROM TagMap WHERE TagId = ? AND NoteId = ?
-                        """, (new_tag_id, new_note_id))  # Vérifie la position pour CE tag et CETTE note
+                        """, (new_tag_id, new_note_id))
                         position = cursor.fetchone()[0]
 
                         try:
@@ -2472,6 +2485,7 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
                                 VALUES (?, ?, ?)
                             """, (new_note_id, new_tag_id, position))
                             applied_count += 1
+                            # NOTE: Ce print est crucial pour la recherche "appliqué"
                             print(
                                 f"📝 Tag '{tag_id}' (new:{new_tag_id}) appliqué à NoteId {new_note_id} (pos:{position})",
                                 flush=True)
@@ -2489,6 +2503,8 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
                     continue
 
                 selected_tags = note_data.get("selectedTagsPerSource", {}).get(choice, [])
+                # *** AJOUTEZ CE PRINT ICI pour voir les tags sélectionnés dans le cas 'file1'/'file2' ***
+                print(f"DEBUG: Note {index_str} ({choice}) - Selected Tags: {selected_tags}", flush=True)
                 if not isinstance(selected_tags, list):
                     print(
                         f"⚠️ 'selectedTagsPerSource' invalide pour le choix '{choice}' de l'index '{index_str}': {selected_tags}",
@@ -2497,6 +2513,10 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
 
                 current_source_db = normalized_db1_path if choice == "file1" else normalized_db2_path
                 new_note_id = note_mapping.get((current_source_db, old_note_id))
+                # *** AJOUTEZ CE PRINT ICI pour voir si le new_note_id est trouvé ***
+                print(f"DEBUG: Note {index_str} ({choice}) - old_note_id: {old_note_id}, new_note_id: {new_note_id}",
+                      flush=True)
+
                 if not new_note_id:
                     print(
                         f"⛔ Nouvelle NoteId introuvable pour la note originale {old_note_id} de {os.path.basename(current_source_db)}. Tags non appliqués.",
@@ -2510,30 +2530,24 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
                     flush=True)
 
                 for tag_id in selected_tags:
+                    # ... (le reste de votre logique d'insertion des tags, y compris la nouvelle logique de mapping)
+                    # Assurez-vous que les prints de "📝 Tag ... appliqué" sont toujours là
                     new_tag_id = None
-
                     # Tenter d'abord de trouver le tag_id via le mapping (ancien ID -> nouvel ID)
-                    # Cette ligne gère le cas où le frontend envoie l'ID original du fichier source
                     mapped_tag_id_key = (current_source_db, tag_id)
                     new_tag_id = tag_id_map.get(mapped_tag_id_key)
 
-                    # Si le mapping n'a rien donné, cela signifie peut-être que Tom Select
-                    # a déjà renvoyé le "nouvel" ID (celui de la DB fusionnée)
-                    # dans ce cas, nous devrions le considérer directement comme le new_tag_id
                     if new_tag_id is None:
-                        # Vérifier si le tag_id reçu est directement un ID existant dans la table Tag fusionnée
                         cursor.execute("SELECT TagId FROM Tag WHERE TagId = ?", (tag_id,))
                         if cursor.fetchone():
-                            new_tag_id = tag_id  # Oui, c'est déjà un ID valide dans la DB fusionnée
+                            new_tag_id = tag_id
                         else:
-                            # Sinon, vérifier si c'est un tag_id qui a été fusionné et est devenu un des *valeurs* de tag_id_map
-                            # C'est pour le cas où l'ID original n'était pas dans la source actuelle mais est un ID fusionné existant
                             for (db, old_id), new_id in tag_id_map.items():
                                 if tag_id == new_id:
                                     new_tag_id = new_id
                                     break
 
-                    if new_tag_id is None:  # Si le tag n'a pas été trouvé après toutes les tentatives
+                    if new_tag_id is None:
                         print(
                             f"⚠️ TagId '{tag_id}' (provenant de {os.path.basename(current_source_db)}) n'a pas pu être mappé à un TagId fusionné. Non appliqué à NoteId {new_note_id}.",
                             flush=True)
@@ -2542,7 +2556,7 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
                     # Trouver une position disponible pour le TagMap
                     cursor.execute("""
                         SELECT COALESCE(MAX(Position), 0) + 1 FROM TagMap WHERE TagId = ? AND NoteId = ?
-                    """, (new_tag_id, new_note_id))  # Vérifie la position pour CE tag et CETTE note
+                    """, (new_tag_id, new_note_id))
                     position = cursor.fetchone()[0]
 
                     try:
@@ -2551,6 +2565,7 @@ def apply_selected_tags(merged_db_path, db1_path, db2_path, note_choices, note_m
                             VALUES (?, ?, ?)
                         """, (new_note_id, new_tag_id, position))
                         applied_count += 1
+                        # NOTE: Ce print est crucial pour la recherche "appliqué"
                         print(f"📝 Tag '{tag_id}' (new:{new_tag_id}) appliqué à NoteId {new_note_id} (pos:{position})",
                               flush=True)
                     except sqlite3.IntegrityError as e:
