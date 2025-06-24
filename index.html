@@ -1556,30 +1556,6 @@
         file2: (previewData.tagMaps.file2 || []).map(tm => ({ ...tm }))
     };
 
-    // ──────────────────────────────────────────────────────────────────────────────
-    //  CONSTRUIRE previewDataEdited.tags.list PAR FICHIER
-    // ──────────────────────────────────────────────────────────────────────────────
-    window.previewDataEdited.tags = { // Utilisez window.previewDataEdited
-        file1: [],
-        file2: []
-    };
-
-    const seen1 = new Set();
-    (previewData.tags.file1 || []).forEach(t => {
-        if (!seen1.has(t.TagId)) {
-            window.previewDataEdited.tags.file1.push({ TagId: t.TagId, Name: t.Name }); // Utilisez window.previewDataEdited
-            seen1.add(t.TagId);
-        }
-    });
-
-    const seen2 = new Set();
-    (previewData.tags.file2 || []).forEach(t => {
-        if (!seen2.has(t.TagId)) {
-            window.previewDataEdited.tags.file2.push({ TagId: t.TagId, Name: t.Name }); // Utilisez window.previewDataEdited
-            seen2.add(t.TagId);
-        }
-    });
-
     // Assurez-vous que fieldFilter et labels sont définis globalement ou passés ici
     // const fieldFilter = { /* ... */ };
     // const labels = { /* ... */ };
