@@ -1031,9 +1031,36 @@
   }
 
   function renderEditableField(table, fileKey, index, field, value, labels) {
+    console.log(`DEBUG_RENDER: Appel de renderEditableField pour table=${table}, fileKey=${fileKey}, index=${index}, field=${field}`);
+
+    // Vérification de window.previewDataEdited
+    if (!window.previewDataEdited) {
+      console.error("DEBUG_RENDER: window.previewDataEdited est undefined.");
+      return `<div>Erreur: Données de prévisualisation manquantes.</div>`;
+    }
+
+    // Vérification de la table spécifique (notes, bookmarks, tags)
+    if (!window.previewDataEdited[table]) {
+      console.error(`DEBUG_RENDER: window.previewDataEdited.${table} est undefined.`);
+      return `<div>Erreur: Données de table '${table}' manquantes.</div>`;
+    }
+
+    // Vérification de la clé de fichier (file1, file2)
+    if (!window.previewDataEdited[table][fileKey]) {
+      console.error(`DEBUG_RENDER: window.previewDataEdited.${table}.${fileKey} est undefined.`);
+      return `<div>Erreur: Données de fichier '${fileKey}' pour la table '${table}' manquantes.</div>`;
+    }
+
+    // Gardez SEULEMENT cette ligne. C'est la ligne corrigée et avec la bonne variable.
+    const noteObj = window.previewDataEdited[table][fileKey]?.[index] || {};
+
+    console.log(`DEBUG_RENDER: noteObj pour ${table}.${fileKey}[${index}] :`, noteObj);
+    console.log(`DEBUG_RENDER: noteObj.TagIds :`, noteObj.TagIds); // Pour le cas des notes et tags
+
     const escaped = escapeHTML(value || '');
     const id = `editable-${table}-${fileKey}-${index}-${field}`;
-    const noteObj = previewDataEdited.notes[fileKey]?.[index] || {};
+    // SUPPRIMER la ligne suivante, elle est en double et incorrecte:
+    // const noteObj = previewDataEdited.notes[fileKey]?.[index] || {}; // <-- À SUPPRIMER
     const noteId = noteObj.NoteId;
 
     // 🔒 Le titre est en lecture seule
