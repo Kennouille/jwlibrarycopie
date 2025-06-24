@@ -1437,6 +1437,7 @@
 
     console.log("buildNotesTab: Génération complète de l'onglet Notes.");
     const contents = window.previewDataEdited.notes;
+    console.log("DEBUG: Avant renderEditableField pour notes, contents:", contents);
     const fieldsToKeep = ["Title", "Content"];
     const maxLength = Math.max(contents.file1.length, contents.file2.length);
 
@@ -1571,6 +1572,7 @@
     // ──────────────────────────────────────────────────────────────────────────────
     for (const tableName of ["bookmarks", "tags"]) {
       const contents = window.previewDataEdited[tableName]; // Utilisez window.previewDataEdited
+      console.log(`DEBUG: Avant renderEditableField pour ${tableName}, contents:`, contents);
       const tabEl = document.getElementById(`tab-${tableName.toLowerCase()}`);
       if (!contents || !Array.isArray(contents.file1) || !Array.isArray(contents.file2)) continue;
 
