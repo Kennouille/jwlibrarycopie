@@ -1307,55 +1307,113 @@
 
 
   function initializeNoteElements() {
-    const tabEl = document.getElementById("tab-notes"); // Récupère l'élément du tableau des notes
+    const tabEl = document.getElementById("tab-notes");
 
-    // *** DÉLÉGATION D'ÉVÉNEMENTS pour .editable et .merge-choice ***
-    // Un seul écouteur sur tabEl pour les événements 'input'
-    tabEl.addEventListener("input", (e) => {
-        if (e.target.classList.contains("editable")) {
-            const { table, file, index, field } = e.target.dataset;
-            if (
-                previewDataEdited[table] &&
-                previewDataEdited[table][file] &&
-                previewDataEdited[table][file][index]
-            ) {
-                previewDataEdited[table][file][index][field] = e.target.value;
+    if (!window.previewDataEdited.notes.mergeChoices) {
+        window.previewDataEdited.notes.mergeChoices = {};
+    }
+    if (!window.previewDataEdited.notes.edited) {
+        window.previewDataEdited.notes.edited = { file1: {}, file2: {} };
+    }
+
+    document.querySelectorAll('#tab-notes .tags-select').forEach(function(selectEl) {
+        if (selectEl.tomselect) {
+            selectEl.tomselect.destroy();
+        }
+
+        const noteRow = selectEl.closest('tr');
+        const noteIndex = Array.from(noteRow.parentNode.children).indexOf(noteRow);
+
+        const file = selectEl.dataset.file;
+
+        const allTags = [
+            ...(window.previewDataEdited.tags.file1 || []),
+            ...(window.previewDataEdited.tags.file2 || [])
+        ];
+        const uniqueTags = Array.from(new Map(allTags.map(tag => [tag.TagId, tag])).values());
+
+        if (!window.previewDataEdited.notes.edited[file]) {
+            window.previewDataEdited.notes.edited[file] = {};
+        }
+        if (!window.previewDataEdited.notes.edited[file][noteIndex]) {
+            window.previewDataEdited.notes.edited[file][noteIndex] = {};
+        }
+        if (!window.previewDataEdited.notes.edited[file][noteIndex].TagIds) {
+            const initialTagsFromDataset = JSON.parse(selectEl.dataset.initialTags || '[]');
+            window.previewDataEdited.notes.edited[file][noteIndex].TagIds = initialTagsFromDataset;
+        }
+
+        const tomSelectInstance = new TomSelect(selectEl, {
+            create: true,
+            plugins: ['remove_button'],
+            options: uniqueTags.map(tag => ({ value: tag.TagId, text: tag.Name })),
+            items: window.previewDataEdited.notes.edited[file][noteIndex].TagIds,
+            onItemAdd: function(value, item) {
+                const currentTags = window.previewDataEdited.notes.edited[file][noteIndex].TagIds || [];
+                const newTagId = parseInt(value);
+                if (!currentTags.includes(newTagId)) {
+                    currentTags.push(newTagId);
+                    window.previewDataEdited.notes.edited[file][noteIndex].TagIds = currentTags;
+                    invalidateNotesCache();
+                }
+            },
+            onItemRemove: function(value) {
+                let currentTags = window.previewDataEdited.notes.edited[file][noteIndex].TagIds || [];
+                const tagToRemove = parseInt(value);
+                window.previewDataEdited.notes.edited[file][noteIndex].TagIds = currentTags.filter(tagId => tagId !== tagToRemove);
                 invalidateNotesCache();
-                console.log(`[DELEGATED INPUT] Table: ${table}, File: ${file}, Index: ${index}, Field: ${field}, New Value:`, previewDataEdited[table][file][index][field]);
+            },
+            render: {
+                option: function(data, escape) { return `<div>${escape(data.text)}</div>`; },
+                item: function(data, escape) { return `<div>${escape(data.text)}</div>`; }
+            }
+        });
+        selectEl.tomselect = tomSelectInstance;
+    });
+
+    tabEl.addEventListener("input", (e) => {
+        if (e.target.classList.contains("editable-field")) {
+            const { file, field } = e.target.dataset;
+            const noteRow = e.target.closest('tr');
+            const index = Array.from(noteRow.parentNode.children).indexOf(noteRow);
+
+            if (
+                window.previewDataEdited.notes &&
+                window.previewDataEdited.notes.edited &&
+                window.previewDataEdited.notes.edited[file] &&
+                window.previewDataEdited.notes.edited[file][index]
+            ) {
+                window.previewDataEdited.notes.edited[file][index][field] = e.target.value;
+                invalidateNotesCache();
             }
         }
     });
 
-    // Un seul écouteur sur tabEl pour les événements 'change' (pour les sélecteurs)
     tabEl.addEventListener("change", (e) => {
         if (e.target.classList.contains("merge-choice")) {
-            const { table, index } = e.target.dataset;
+            const index = e.target.dataset.index;
+
             if (
-                previewDataEdited[table] &&
-                previewDataEdited[table].mergeChoices &&
-                previewDataEdited[table].mergeChoices[index] !== undefined
+                window.previewDataEdited.notes &&
+                window.previewDataEdited.notes.mergeChoices &&
+                window.previewDataEdited.notes.mergeChoices[index]
             ) {
-                previewDataEdited[table].mergeChoices[index] = e.target.value;
+                window.previewDataEdited.notes.mergeChoices[index].choice = e.target.value;
                 invalidateNotesCache();
-                console.log(`[DELEGATED CHANGE] Table: ${table}, Index: ${index}, New Choice:`, previewDataEdited[table].mergeChoices[index]);
             }
         }
     });
 
-    // Logique pour le bouton "Imprimer Notes en PDF" (reste inchangée, car un seul bouton)
     const existingPdfBtn = document.getElementById("exportPdfBtn");
     if (existingPdfBtn) {
-        existingPdfBtn.remove(); // Supprimer l'ancien s'il est appelé plusieurs fois
+        existingPdfBtn.remove();
     }
     const btn = document.createElement("button");
     btn.id = "exportPdfBtn";
     btn.textContent = "🖨️ Imprimer Notes en PDF";
     btn.style.margin = "10px 0";
-    btn.onclick = exportNotesToPdf; // Assurez-vous que exportNotesToPdf est définie ailleurs
-    tabEl.prepend(btn); // Ajoute le bouton en haut du conteneur de l'onglet Notes
-
-    // *** APPEL À L'INITIALISATION PARESSEUSE DE TOM SELECT ***
-    initializeTomSelectsLazily();
+    btn.onclick = exportNotesToPdf;
+    tabEl.prepend(btn);
   }
 
   function invalidateNotesCache() {
@@ -1371,27 +1429,30 @@
     console.log("buildNotesTab: Démarrage de la reconstruction de l'onglet Notes.");
     const tabEl = document.getElementById("tab-notes");
 
+    // Assurez-vous que previewDataEdited est accessible globalement (déclaré avec window.)
+    // Si previewDataEdited n'est pas déclaré avec 'window.', vous devrez le faire dans processLoadedPreviewData
+    // pour qu'il soit accessible ici.
+    // Exemple: window.previewDataEdited = JSON.parse(JSON.stringify(previewData));
+
     // Calculer un hash simple des données des notes
-    // C'est une méthode simple pour détecter si les données ont changé.
-    // Une méthode plus robuste serait de hacher un JSON.stringify(previewDataEdited.notes)
-    // mais ça peut aussi être coûteux. Pour l'instant, on fait simple.
-    const currentNotesDataState = JSON.stringify(previewDataEdited.notes);
+    const currentNotesDataState = JSON.stringify(window.previewDataEdited.notes); // Utilisez window.previewDataEdited
 
     // Si le HTML est en cache ET que les données n'ont pas changé, utilisez le cache
     if (cachedNotesTabHTML && notesDataHash === currentNotesDataState) {
         console.log("buildNotesTab: Chargement de l'onglet Notes depuis le cache.");
         tabEl.innerHTML = cachedNotesTabHTML;
-        // Important : Ré-initialiser Tom Select et les autres écouteurs même si c'est depuis le cache !
-        // Car les éléments DOM ont été recréés par innerHTML
-        initializeNoteElements(); // Nouvelle fonction pour regrouper les initialisations
-        return; // Sortir de la fonction
+        initializeNoteElements();
+        return;
     }
 
     console.log("buildNotesTab: Génération complète de l'onglet Notes.");
-    // --- Votre code existant pour générer le HTML ---
-    const contents = previewDataEdited.notes;
+    const contents = window.previewDataEdited.notes; // Utilisez window.previewDataEdited
     const fieldsToKeep = ["Title", "Content"];
     const maxLength = Math.max(contents.file1.length, contents.file2.length);
+
+    // Initialisez la structure pour stocker les choix de fusion pour les notes
+    if (!window.mergeChoices) window.mergeChoices = {};
+    if (!window.mergeChoices.notes) window.mergeChoices.notes = {};
 
     const generatedHTML = `
         <table style="width: 100%; border-collapse: collapse;">
@@ -1404,8 +1465,47 @@
             </thead>
             <tbody>
                 ${Array.from({ length: maxLength }).map((_, index) => {
-                    const item1 = contents.file1[index] || {};
-                    const item2 = contents.file2[index] || {};
+                    const item1 = contents.file1[index]; // Peut être undefined
+                    const item2 = contents.file2[index]; // Peut être undefined
+
+                    let defaultChoice = 'ignore'; // Valeur par défaut la plus sûre
+
+                    // Déterminer le choix par défaut et les options disponibles
+                    let optionsHtml = '';
+                    if (item1 && item2) {
+                        defaultChoice = 'both';
+                        optionsHtml += `<option value="both">Garder les deux</option>`;
+                        optionsHtml += `<option value="file1">Garder fichier 1</option>`;
+                        optionsHtml += `<option value="file2">Garder fichier 2</option>`;
+                        optionsHtml += `<option value="ignore">Ignorer</option>`;
+                    } else if (item1) {
+                        defaultChoice = 'file1'; // Seulement dans file1
+                        optionsHtml += `<option value="file1">Garder fichier 1</option>`;
+                        optionsHtml += `<option value="ignore">Ignorer</option>`;
+                    } else if (item2) {
+                        defaultChoice = 'file2'; // Seulement dans file2
+                        optionsHtml += `<option value="file2">Garder fichier 2</option>`;
+                        optionsHtml += `<option value="ignore">Ignorer</option>`;
+                    }
+
+                    // Mettre à jour la structure mergeChoices avec le choix par défaut
+                    // Cela est crucial pour que le payload envoyé au backend soit correct si l'utilisateur ne change rien.
+                    window.mergeChoices.notes[index] = {
+                        choice: defaultChoice,
+                        edited: {
+                            file1: item1 ? { ...item1 } : {}, // Copie pour pouvoir modifier
+                            file2: item2 ? { ...item2 } : {}
+                        },
+                        noteIds: { // Pour les notes, nous voulons stocker les NoteId originaux
+                            file1: item1 ? item1.NoteId : null,
+                            file2: item2 ? item2.NoteId : null
+                        },
+                        // Initialisation des tags sélectionnés.
+                        // C'est une fusion simple. Vous devrez peut-être ajuster cette logique si vous voulez une fusion plus sophistiquée des tags au niveau du frontend.
+                        selectedTags: (item1 && item2)
+                            ? [...new Set([...(item1.TagIds || []), ...(item2.TagIds || [])])] // Fusionne les tags et retire les doublons
+                            : (item1 ? (item1.TagIds || []) : (item2 ? (item2.TagIds || []) : []))
+                    };
 
                     const html1 = fieldsToKeep.map(field =>
                         renderEditableField("notes", "file1", index, field, item1[field], labels)
@@ -1421,10 +1521,7 @@
                             <td style="padding: 6px; border: 1px solid #ccc;">${html2}</td>
                             <td style="padding: 6px; border: 1px solid #ccc;">
                                 <select data-table="notes" data-index="${index}" class="merge-choice">
-                                    <option value="both">Garder les deux</option>
-                                    <option value="file1">Garder fichier 1</option>
-                                    <option value="file2">Garder fichier 2</option>
-                                    <option value="ignore">Ignorer</option>
+                                    ${optionsHtml}
                                 </select>
                             </td>
                         </tr>`;
@@ -1433,7 +1530,7 @@
         </table>
     `;
 
-    tabEl.innerHTML = generatedHTML; // Insérer le HTML généré
+    tabEl.innerHTML = generatedHTML;
 
     // Stocker le HTML et le hash pour le caching futur
     cachedNotesTabHTML = generatedHTML;
@@ -1443,9 +1540,9 @@
     initializeNoteElements();
   }
 
-  function processLoadedPreviewData(previewData) { // Ancien nom: loadPreviewData
+  function processLoadedPreviewData(previewData) {
     document.getElementById("preview-section").classList.remove("hidden");
-    previewDataEdited = JSON.parse(JSON.stringify(previewData)); // Copie indépendante
+    window.previewDataEdited = JSON.parse(JSON.stringify(previewData)); // Copie indépendante. IMPORTANT: Utilisez window.previewDataEdited
 
     // 🧠 Construire pour chaque fichier une map NoteId → [TagId1, TagId2, ...]
     function buildNoteToTagIdsMap(tagMapArray) {
@@ -1461,17 +1558,17 @@
     const tagIdsMap2 = buildNoteToTagIdsMap(previewData.tagMaps.file2);
 
     // Affecter à chaque note son tableau TagIds
-    (previewDataEdited.notes.file1 || []).forEach(note => {
+    (window.previewDataEdited.notes.file1 || []).forEach(note => { // Utilisez window.previewDataEdited
         note.TagIds = tagIdsMap1[note.NoteId] || [];
     });
-    (previewDataEdited.notes.file2 || []).forEach(note => {
+    (window.previewDataEdited.notes.file2 || []).forEach(note => { // Utilisez window.previewDataEdited
         note.TagIds = tagIdsMap2[note.NoteId] || [];
     });
 
     // ──────────────────────────────────────────────────────────────────────────────
     //  INITIALISER previewDataEdited.tagMaps EN GARDANT DES TABLEAUX
     // ──────────────────────────────────────────────────────────────────────────────
-    previewDataEdited.tagMaps = {
+    window.previewDataEdited.tagMaps = { // Utilisez window.previewDataEdited
         file1: (previewData.tagMaps.file1 || []).map(tm => ({ ...tm })),
         file2: (previewData.tagMaps.file2 || []).map(tm => ({ ...tm }))
     };
@@ -1479,7 +1576,7 @@
     // ──────────────────────────────────────────────────────────────────────────────
     //  CONSTRUIRE previewDataEdited.tags.list PAR FICHIER
     // ──────────────────────────────────────────────────────────────────────────────
-    previewDataEdited.tags = {
+    window.previewDataEdited.tags = { // Utilisez window.previewDataEdited
         file1: [],
         file2: []
     };
@@ -1487,7 +1584,7 @@
     const seen1 = new Set();
     (previewData.tags.file1 || []).forEach(t => {
         if (!seen1.has(t.TagId)) {
-            previewDataEdited.tags.file1.push({ TagId: t.TagId, Name: t.Name });
+            window.previewDataEdited.tags.file1.push({ TagId: t.TagId, Name: t.Name }); // Utilisez window.previewDataEdited
             seen1.add(t.TagId);
         }
     });
@@ -1495,12 +1592,12 @@
     const seen2 = new Set();
     (previewData.tags.file2 || []).forEach(t => {
         if (!seen2.has(t.TagId)) {
-            previewDataEdited.tags.file2.push({ TagId: t.TagId, Name: t.Name });
+            window.previewDataEdited.tags.file2.push({ TagId: t.TagId, Name: t.Name }); // Utilisez window.previewDataEdited
             seen2.add(t.TagId);
         }
     });
 
-    // fieldFilter et labels sont maintenant globaux, vous pouvez retirer leur déclaration d'ici
+    // Assurez-vous que fieldFilter et labels sont définis globalement ou passés ici
     // const fieldFilter = { /* ... */ };
     // const labels = { /* ... */ };
 
@@ -1510,35 +1607,21 @@
     invalidateNotesCache(); // Invalider le cache des notes pour forcer la première construction
     window.refreshNotesTab(); // Appeler le rafraîchissement de l'onglet Notes (qui gère l'affichage)
 
-    // AFFICHER LES AUTRES ONGLETs APRÈS AVOIR CHARGÉ LES DONNÉES
-    // Ceci appellera showTab('bookmarks') qui à son tour construira l'onglet Bookmarks
-    // et showTab('tags') pour l'onglet Tags.
-    // L'ordre ici peut être ajusté si vous voulez qu'un onglet particulier soit affiché par défaut.
-    // Par exemple, si vous voulez que Bookmarks soit le premier affiché après le chargement:
-    // showTab('bookmarks'); // Ceci devrait être le tab par défaut après le chargement
-    // Puis l'utilisateur peut cliquer sur Notes ou Tags.
-
-    // Si vous voulez que l'onglet Notes soit le premier affiché, l'appel à window.refreshNotesTab() au-dessus suffit.
-    // Les appels showTab suivants sont pour s'assurer qu'ils sont prêts pour le clic utilisateur.
-    // Vous pouvez commenter ces lignes si le HTML des onglets bookmarks/tags est déjà généré
-    // une fois et n'a pas besoin d'être re-généré au premier affichage.
-
-    // La logique de génération des autres onglets (bookmarks et tags) est déjà dans le bloc
-    // `for (const tableName of ["bookmarks", "tags"]) { ... }` que vous avez.
-    // Il faut juste s'assurer qu'il est exécuté.
-    // Au lieu d'appeler showTab directement, assurons-nous que ce bloc s'exécute.
-
     // ──────────────────────────────────────────────────────────────────────────────
     // Rendu des autres onglets : Bookmarks et Tags (si cette logique est encore dans loadPreviewData)
     // ──────────────────────────────────────────────────────────────────────────────
     for (const tableName of ["bookmarks", "tags"]) {
-      const contents = previewDataEdited[tableName]; // Utilisez previewDataEdited
+      const contents = window.previewDataEdited[tableName]; // Utilisez window.previewDataEdited
       const tabEl = document.getElementById(`tab-${tableName.toLowerCase()}`);
       if (!contents || !Array.isArray(contents.file1) || !Array.isArray(contents.file2)) continue;
 
       const fieldsToKeep = fieldFilter[tableName.toLowerCase()] || []; // Assurez-vous que fieldFilter est global
 
       const maxLength = Math.max(contents.file1.length, contents.file2.length);
+
+      // Initialisez la structure pour stocker les choix de fusion pour cet onglet si elle n'existe pas
+      if (!window.mergeChoices) window.mergeChoices = {};
+      if (!window.mergeChoices[tableName]) window.mergeChoices[tableName] = {};
 
       tabEl.innerHTML = `
         <table style="width: 100%; border-collapse: collapse;">
@@ -1551,8 +1634,45 @@
           </thead>
           <tbody>
             ${Array.from({ length: maxLength }).map((_, index) => {
-              const item1 = contents.file1[index] || {};
-              const item2 = contents.file2[index] || {};
+              const item1 = contents.file1[index]; // Peut être undefined
+              const item2 = contents.file2[index]; // Peut être undefined
+
+              let defaultChoice = 'ignore'; // Valeur par défaut la plus sûre
+
+              // Déterminer le choix par défaut et les options disponibles
+              let optionsHtml = '';
+              if (item1 && item2) {
+                  defaultChoice = 'both';
+                  optionsHtml += `<option value="both">Garder les deux</option>`;
+                  optionsHtml += `<option value="file1">Garder fichier 1</option>`;
+                  optionsHtml += `<option value="file2">Garder fichier 2</option>`;
+                  optionsHtml += `<option value="ignore">Ignorer</option>`;
+              } else if (item1) {
+                  defaultChoice = 'file1'; // Seulement dans file1
+                  optionsHtml += `<option value="file1">Garder fichier 1</option>`;
+                  optionsHtml += `<option value="ignore">Ignorer</option>`;
+              } else if (item2) {
+                  defaultChoice = 'file2'; // Seulement dans file2
+                  optionsHtml += `<option value="file2">Garder fichier 2</option>`;
+                  optionsHtml += `<option value="ignore">Ignorer</option>`;
+              }
+
+              // Mettre à jour la structure mergeChoices avec le choix par défaut
+              // Cela est crucial pour que le payload envoyé au backend soit correct si l'utilisateur ne change rien.
+              window.mergeChoices[tableName][index] = {
+                  choice: defaultChoice,
+                  edited: {
+                      file1: item1 ? { ...item1 } : {},
+                      file2: item2 ? { ...item2 } : {}
+                  },
+                  // Ajoutez ici les NoteIds/BookmarkIds/TagIds si nécessaire pour la fusion backend
+                  // Par exemple pour les tags:
+                  tagIds: (item1 && item2) ? [...(item1.TagIds || []), ...(item2.TagIds || [])] : (item1 ? item1.TagIds : item2 ? item2.TagIds : []), // Exemple pour les tags s'ils ont des TagIds
+                  // Pour les bookmarks/tags, les IDs sont souvent les IDs de l'entité elle-même
+                  id1: item1 ? (item1.NoteId || item1.BookmarkId || item1.TagId) : null,
+                  id2: item2 ? (item2.NoteId || item2.BookmarkId || item2.TagId) : null,
+              };
+
 
               const html1 = fieldsToKeep.map(field =>
                 renderEditableField(tableName.toLowerCase(), "file1", index, field, item1[field], labels)
@@ -1568,10 +1688,7 @@
                   <td style="padding: 6px; border: 1px solid #ccc;">${html2}</td>
                   <td style="padding: 6px; border: 1px solid #ccc;">
                     <select data-table="${tableName}" data-index="${index}" class="merge-choice">
-                      <option value="both">Garder les deux</option>
-                      <option value="file1">Garder fichier 1</option>
-                      <option value="file2">Garder fichier 2</option>
-                      <option value="ignore">Ignorer</option>
+                      ${optionsHtml}
                     </select>
                   </td>
                 </tr>`;
@@ -1584,14 +1701,24 @@
         el.addEventListener("input", (e) => {
           const { table, file, index, field } = e.target.dataset;
           if (
-            previewDataEdited[table] &&
-            previewDataEdited[table][file] &&
-            previewDataEdited[table][file][index]
+            window.previewDataEdited[table] && // Utilisez window.previewDataEdited
+            window.previewDataEdited[table][file] && // Utilisez window.previewDataEdited
+            window.previewDataEdited[table][file][index] // Utilisez window.previewDataEdited
           ) {
-            previewDataEdited[table][file][index][field] = e.target.value;
-            console.log(`[EDITABLE INPUT - OTHER TABS] Table: ${table}, File: ${file}, Index: ${index}, Field: ${field}, New Value:`, previewDataEdited[table][file][index][field]);
+            window.previewDataEdited[table][file][index][field] = e.target.value; // Utilisez window.previewDataEdited
+            console.log(`[EDITABLE INPUT - OTHER TABS] Table: ${table}, File: ${file}, Index: ${index}, Field: ${field}, New Value:`, window.previewDataEdited[table][file][index][field]); // Utilisez window.previewDataEdited
           }
         });
+      });
+
+      // Écouteur pour les changements de sélection du merge-choice
+      tabEl.querySelectorAll(".merge-choice").forEach(selectEl => {
+          selectEl.value = window.mergeChoices[tableName][selectEl.dataset.index].choice; // Assurez que la valeur est bien la valeur par défaut
+          selectEl.addEventListener('change', (e) => {
+              const { table, index } = e.target.dataset;
+              window.mergeChoices[table][index].choice = e.target.value;
+              console.log(`[MERGE CHOICE CHANGE] Table: ${table}, Index: ${index}, New Choice:`, e.target.value);
+          });
       });
       // Si les autres onglets ont des Tom Select, ils devraient aussi avoir une fonction initializeOtherTabElements()
       // comme initializeNoteElements()
