@@ -1422,22 +1422,12 @@
     console.log("Cache de l'onglet Notes invalidé.");
   }
 
-  // ──────────────────────────────────────────────────────────────────────────────
-  // Fonction réutilisable pour générer l’onglet Notes
-  // ──────────────────────────────────────────────────────────────────────────────
   function buildNotesTab() {
     console.log("buildNotesTab: Démarrage de la reconstruction de l'onglet Notes.");
     const tabEl = document.getElementById("tab-notes");
 
-    // Assurez-vous que previewDataEdited est accessible globalement (déclaré avec window.)
-    // Si previewDataEdited n'est pas déclaré avec 'window.', vous devrez le faire dans processLoadedPreviewData
-    // pour qu'il soit accessible ici.
-    // Exemple: window.previewDataEdited = JSON.parse(JSON.stringify(previewData));
+    const currentNotesDataState = JSON.stringify(window.previewDataEdited.notes);
 
-    // Calculer un hash simple des données des notes
-    const currentNotesDataState = JSON.stringify(window.previewDataEdited.notes); // Utilisez window.previewDataEdited
-
-    // Si le HTML est en cache ET que les données n'ont pas changé, utilisez le cache
     if (cachedNotesTabHTML && notesDataHash === currentNotesDataState) {
         console.log("buildNotesTab: Chargement de l'onglet Notes depuis le cache.");
         tabEl.innerHTML = cachedNotesTabHTML;
@@ -1446,11 +1436,10 @@
     }
 
     console.log("buildNotesTab: Génération complète de l'onglet Notes.");
-    const contents = window.previewDataEdited.notes; // Utilisez window.previewDataEdited
+    const contents = window.previewDataEdited.notes;
     const fieldsToKeep = ["Title", "Content"];
     const maxLength = Math.max(contents.file1.length, contents.file2.length);
 
-    // Initialisez la structure pour stocker les choix de fusion pour les notes
     if (!window.mergeChoices) window.mergeChoices = {};
     if (!window.mergeChoices.notes) window.mergeChoices.notes = {};
 
@@ -1465,12 +1454,10 @@
             </thead>
             <tbody>
                 ${Array.from({ length: maxLength }).map((_, index) => {
-                    const item1 = contents.file1[index]; // Peut être undefined
-                    const item2 = contents.file2[index]; // Peut être undefined
+                    const item1 = contents.file1[index];
+                    const item2 = contents.file2[index];
 
-                    let defaultChoice = 'ignore'; // Valeur par défaut la plus sûre
-
-                    // Déterminer le choix par défaut et les options disponibles
+                    let defaultChoice = 'ignore';
                     let optionsHtml = '';
                     if (item1 && item2) {
                         defaultChoice = 'both';
@@ -1479,41 +1466,39 @@
                         optionsHtml += `<option value="file2">Garder fichier 2</option>`;
                         optionsHtml += `<option value="ignore">Ignorer</option>`;
                     } else if (item1) {
-                        defaultChoice = 'file1'; // Seulement dans file1
+                        defaultChoice = 'file1';
                         optionsHtml += `<option value="file1">Garder fichier 1</option>`;
                         optionsHtml += `<option value="ignore">Ignorer</option>`;
                     } else if (item2) {
-                        defaultChoice = 'file2'; // Seulement dans file2
+                        defaultChoice = 'file2';
                         optionsHtml += `<option value="file2">Garder fichier 2</option>`;
                         optionsHtml += `<option value="ignore">Ignorer</option>`;
                     }
 
-                    // Mettre à jour la structure mergeChoices avec le choix par défaut
-                    // Cela est crucial pour que le payload envoyé au backend soit correct si l'utilisateur ne change rien.
                     window.mergeChoices.notes[index] = {
                         choice: defaultChoice,
                         edited: {
-                            file1: item1 ? { ...item1 } : {}, // Copie pour pouvoir modifier
+                            file1: item1 ? { ...item1 } : {},
                             file2: item2 ? { ...item2 } : {}
                         },
-                        noteIds: { // Pour les notes, nous voulons stocker les NoteId originaux
+                        noteIds: {
                             file1: item1 ? item1.NoteId : null,
                             file2: item2 ? item2.NoteId : null
                         },
-                        // Initialisation des tags sélectionnés.
-                        // C'est une fusion simple. Vous devrez peut-être ajuster cette logique si vous voulez une fusion plus sophistiquée des tags au niveau du frontend.
                         selectedTags: (item1 && item2)
-                            ? [...new Set([...(item1.TagIds || []), ...(item2.TagIds || [])])] // Fusionne les tags et retire les doublons
+                            ? [...new Set([...(item1.TagIds || []), ...(item2.TagIds || [])])]
                             : (item1 ? (item1.TagIds || []) : (item2 ? (item2.TagIds || []) : []))
                     };
 
+                    // --- CORRECTION APPLIQUÉE ICI ---
                     const html1 = fieldsToKeep.map(field =>
-                        renderEditableField("notes", "file1", index, field, item1[field], labels)
+                        renderEditableField("notes", "file1", index, field, item1 ? item1[field] : null, labels)
                     ).join("");
 
                     const html2 = fieldsToKeep.map(field =>
-                        renderEditableField("notes", "file2", index, field, item2[field], labels)
+                        renderEditableField("notes", "file2", index, field, item2 ? item2[field] : null, labels)
                     ).join("");
+                    // --- FIN DE LA CORRECTION ---
 
                     return `
                         <tr>
@@ -1532,11 +1517,9 @@
 
     tabEl.innerHTML = generatedHTML;
 
-    // Stocker le HTML et le hash pour le caching futur
     cachedNotesTabHTML = generatedHTML;
     notesDataHash = currentNotesDataState;
 
-    // Initialiser tous les éléments interactifs APRÈS que le HTML est dans le DOM
     initializeNoteElements();
   }
 
