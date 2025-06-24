@@ -1620,6 +1620,13 @@ def merge_tags_and_tagmap(merged_db_path, file1_db, file2_db, note_mapping, loca
             for k, v in note_mapping.items()
         }
 
+        print(f"DEBUG: Taille de note_mapping AVANT normalisation: {len(note_mapping)}", flush=True)
+        print(f"DEBUG: Taille de normalized_note_mapping APRÈS normalisation: {len(normalized_note_mapping)}",
+              flush=True)
+        print(f"DEBUG: Exemple de note_mapping (premiers 5) : {list(note_mapping.items())[:5]}", flush=True)
+        print(f"DEBUG: Exemple de normalized_note_mapping (premiers 5) : {list(normalized_note_mapping.items())[:5]}",
+              flush=True)
+
         # Récupération du max TagMapId existant
         cursor.execute("SELECT COALESCE(MAX(TagMapId), 0) FROM TagMap")
         max_tagmap_id = cursor.fetchone()[0]
