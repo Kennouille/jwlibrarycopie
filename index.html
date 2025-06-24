@@ -1675,11 +1675,13 @@
 
 
               const html1 = fieldsToKeep.map(field =>
-                renderEditableField(tableName.toLowerCase(), "file1", index, field, item1[field], labels)
+                // Si item1 est undefined, passez null comme valeur pour éviter l'erreur.
+                renderEditableField(tableName.toLowerCase(), "file1", index, field, item1 ? item1[field] : null, labels)
               ).join("");
 
               const html2 = fieldsToKeep.map(field =>
-                renderEditableField(tableName.toLowerCase(), "file2", index, field, item2[field], labels)
+                // Si item2 est undefined, passez null comme valeur pour éviter l'erreur.
+                renderEditableField(tableName.toLowerCase(), "file2", index, field, item2 ? item2[field] : null, labels)
               ).join("");
 
               return `
