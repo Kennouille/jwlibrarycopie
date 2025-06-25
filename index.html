@@ -1592,7 +1592,9 @@
 
     // Une fois que previewDataEdited est COMPLÈTEMENT prêt:
     invalidateNotesCache(); // Invalider le cache des notes pour forcer la première construction
-    window.refreshNotesTab(); // Appeler le rafraîchissement de l'onglet Notes (qui gère l'affichage)
+    console.log("DEBUG_CALL_REFRESH: Tente d'appeler window.refreshNotesTab().");
+    window.refreshNotesTab(); // Ou window.refreshNotesTab().then(...) si c'est géré comme une Promise
+    console.log("DEBUG_CALL_REFRESH: Appel à window.refreshNotesTab() effectué.");
 
     // ──────────────────────────────────────────────────────────────────────────────
     // Rendu des autres onglets : Bookmarks et Tags (si cette logique est encore dans loadPreviewData)
