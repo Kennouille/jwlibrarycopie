@@ -1449,7 +1449,7 @@
     console.log("Cache de l'onglet Notes invalidé.");
   }
 
-  function buildNotesTab() {
+  window.buildNotesTab = function() {
     console.log("DEBUG_BUILD_NOTES: buildNotesTab a commencé son exécution.");
     console.log("buildNotesTab: Démarrage de la reconstruction de l'onglet Notes.");
     const tabEl = document.getElementById("tab-notes");
@@ -1572,7 +1572,7 @@
     }
 
     console.log("DEBUG_BUILD_NOTES: buildNotesTab a terminé son exécution.");
-  }
+  };
 
   function processLoadedPreviewData(previewData) {
     document.getElementById("preview-section").classList.remove("hidden");
@@ -2034,10 +2034,10 @@
         setTimeout(() => {
             console.log("DEBUG_REFRESH_INSIDE: Exécution du setTimeout interne de refreshNotesTab.");
             try {
+                // Ici, window.buildNotesTab sera maintenant défini
                 window.buildNotesTab();
 
                 const elapsedBuildTime = Date.now() - startAnimationTime;
-                // Assurez-vous que MIN_LOAD_TIME_MS est défini ailleurs, par exemple: const MIN_LOAD_TIME_MS = 300;
                 const remainingTime = MIN_LOAD_TIME_MS - elapsedBuildTime;
 
                 if (remainingTime > 0) {
@@ -2050,7 +2050,8 @@
                     resolve();
                 }
             } catch (error) {
-                console.error("ERROR_BUILD_NOTES: Erreur lors de l'exécution de buildNotesTab :", error);
+                // Cette erreur devrait maintenant être plus informative si buildNotesTab échoue pour une autre raison
+                console.error("ERROR_REFRESH: Erreur lors de l'exécution de window.buildNotesTab dans refreshNotesTab :", error);
                 resolve();
             }
         }, 0);
