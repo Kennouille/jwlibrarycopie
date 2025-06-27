@@ -854,7 +854,6 @@
   let cachedNotesTabHTML = null; // Variable pour stocker le HTML de l'onglet Notes
   let notesDataHash = null;      // Pour stocker un "hash" ou une représentation de l'état actuel des données de notes
                                // afin de savoir si les données ont changé.
-  const MIN_LOAD_TIME_MS = 300;
 
   const labels = {
     Title: "Titre",
@@ -1111,7 +1110,7 @@
 
   // Variables pour gérer les animations de barre de progression
   const progressAnimations = {};
-  const MIN_LOAD_TIME_MS = 3000; // Ou 30000ms pour 30 secondes
+  const MIN_LOAD_TIME_MS = 300; // Ou 30000ms pour 30 secondes
 
   function startProgressBarAnimation(buttonElement, tabName) {
       const progressBar = buttonElement.querySelector('.progress-bar');
