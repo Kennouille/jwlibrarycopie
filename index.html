@@ -1607,25 +1607,26 @@
         file2: (previewData.tagMaps.file2 || []).map(tm => ({ ...tm }))
     };
 
-    // Assurez-vous que fieldFilter et labels sont définis globalement ou passés ici
-    // const fieldFilter = { /* ... */ };
-    // const labels = { /* ... */ };
-
     // --- NOUVEAUX APPELS POUR LES AUTRES ONGLET ---
 
     // Une fois que previewDataEdited est COMPLÈTEMENT prêt:
-    invalidateNotesCache(); // Invalider le cache des notes pour forcer la première construction
+    // Invalider le cache des notes pour forcer la première construction
+    invalidateNotesCache();
+    // Appelle refreshNotesTab() pour générer le HTML des notes.
+    // Assure-toi que la fonction refreshNotesTab ne rend pas l'onglet visible
+    // mais seulement met à jour son contenu HTML.
     console.log("DEBUG_CALL_REFRESH: Tente d'appeler window.refreshNotesTab().");
-    window.refreshNotesTab(); // Ou window.refreshNotesTab().then(...) si c'est géré comme une Promise
+    window.refreshNotesTab();
     console.log("DEBUG_CALL_REFRESH: Appel à window.refreshNotesTab() effectué.");
 
     // ──────────────────────────────────────────────────────────────────────────────
-    // Rendu des autres onglets : Bookmarks et Tags (si cette logique est encore dans loadPreviewData)
+    // Rendu initial des autres onglets : Bookmarks et Tags
     // ──────────────────────────────────────────────────────────────────────────────
     for (const tableName of ["bookmarks", "tags"]) {
       const contents = window.previewDataEdited[tableName]; // Utilisez window.previewDataEdited
       console.log(`DEBUG: Avant renderEditableField pour ${tableName}, contents:`, contents);
-      const tabEl = document.getElementById(`tab-${tableName.toLowerCase()}`);
+      const tabEl = document.getElementById(`tab-${tableName.toLowerCase()}`); // Récupère le conteneur de l'onglet
+
       if (!contents || !Array.isArray(contents.file1) || !Array.isArray(contents.file2)) continue;
 
       const fieldsToKeep = fieldFilter[tableName.toLowerCase()] || []; // Assurez-vous que fieldFilter est global
@@ -1678,22 +1679,17 @@
                       file1: item1 ? { ...item1 } : {},
                       file2: item2 ? { ...item2 } : {}
                   },
-                  // Ajoutez ici les NoteIds/BookmarkIds/TagIds si nécessaire pour la fusion backend
-                  // Par exemple pour les tags:
-                  tagIds: (item1 && item2) ? [...(item1.TagIds || []), ...(item2.TagIds || [])] : (item1 ? item1.TagIds : item2 ? item2.TagIds : []), // Exemple pour les tags s'ils ont des TagIds
-                  // Pour les bookmarks/tags, les IDs sont souvent les IDs de l'entité elle-même
+                  tagIds: (item1 && item2) ? [...(item1.TagIds || []), ...(item2.TagIds || [])] : (item1 ? item1.TagIds : item2 ? item2.TagIds : []),
                   id1: item1 ? (item1.NoteId || item1.BookmarkId || item1.TagId) : null,
                   id2: item2 ? (item2.NoteId || item2.BookmarkId || item2.TagId) : null,
               };
 
 
               const html1 = fieldsToKeep.map(field =>
-                // Si item1 est undefined, passez null comme valeur pour éviter l'erreur.
                 renderEditableField(tableName.toLowerCase(), "file1", index, field, item1 ? item1[field] : null, labels)
               ).join("");
 
               const html2 = fieldsToKeep.map(field =>
-                // Si item2 est undefined, passez null comme valeur pour éviter l'erreur.
                 renderEditableField(tableName.toLowerCase(), "file2", index, field, item2 ? item2[field] : null, labels)
               ).join("");
 
@@ -1735,8 +1731,28 @@
               console.log(`[MERGE CHOICE CHANGE] Table: ${table}, Index: ${index}, New Choice:`, e.target.value);
           });
       });
-      // Si les autres onglets ont des Tom Select, ils devraient aussi avoir une fonction initializeOtherTabElements()
-      // comme initializeNoteElements()
+    }
+
+    // --- NOUVEAU : Masquer tous les contenus d'onglets après leur construction ---
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.add('hidden');
+        tab.classList.remove('active'); // S'assurer que la classe 'active' est bien retirée
+    });
+
+    // --- NOUVEAU : Désactiver tous les boutons d'onglets visuellement ---
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+        const progressBar = btn.querySelector('.progress-bar');
+        if (progressBar) { // Réinitialiser les barres de progression
+            progressBar.style.width = '0%';
+            progressBar.style.transition = 'none';
+        }
+    });
+
+    // --- NOUVEAU : Activer visuellement le bouton "Notes" par défaut (sans afficher son contenu) ---
+    const defaultNotesButton = document.querySelector('.tab-btn[onclick*="showTab(\'notes\')"]');
+    if (defaultNotesButton) {
+        defaultNotesButton.classList.add('active');
     }
   }
 
@@ -2059,37 +2075,38 @@
   };
 
   async function showTab(tabName) {
-    // Masquer tous les contenus
+    // Masquer tous les contenus d'onglets
     document.querySelectorAll('.tab-content').forEach(tab => {
         tab.classList.add('hidden');
+        tab.classList.remove('active'); // S'assurer que 'active' est retirée
     });
 
-    // Trouver le bouton cliqué
-    const clickedBtn = Array.from(document.querySelectorAll('.tab-btn')).find(btn =>
-        btn.textContent.toLowerCase().includes(tabName)
-    );
-
-    // Réinitialiser tous les boutons sauf celui cliqué
+    // Désactiver tous les boutons d'onglets visuellement et réinitialiser leurs barres
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.remove('active');
         const progressBar = btn.querySelector('.progress-bar');
-        if (progressBar && btn !== clickedBtn) {
+        if (progressBar) {
             progressBar.style.width = '0%';
             progressBar.style.transition = 'none';
         }
     });
 
-    // Activer le bouton cliqué et démarrer la barre
+    // Trouver le bouton correspondant à l'onglet cliqué (plus fiable avec un data-tab ou un ID)
+    // On utilise l'attribut onclick pour trouver le bouton, c'est ce que tu as dans ton HTML.
+    const clickedBtn = document.querySelector(`.tab-btn[onclick*="showTab('${tabName}')"]`);
+
+    // Activer le bouton cliqué
     if (clickedBtn) {
         clickedBtn.classList.add('active');
-        clickedBtn.dataset.tabName = tabName;
-        startProgressBarAnimation(clickedBtn, tabName);
+        // Pas besoin de clickedBtn.dataset.tabName = tabName; ici si l'onclick est suffisant.
+        startProgressBarAnimation(clickedBtn, tabName); // Ton animation pour le clic
     }
 
     // Afficher le contenu cible
     const targetTabContent = document.getElementById(`tab-${tabName}`);
     if (targetTabContent) {
-        targetTabContent.classList.remove('hidden');
+        targetTabContent.classList.remove('hidden'); // Rendre visible
+        targetTabContent.classList.add('active'); // Ajouter 'active' pour les styles CSS de contenu (si tu en as)
     }
 
     try {
